@@ -99,7 +99,7 @@ def to_transl_mat(vec):
 
     Examples
     --------
-    >>> make_transl_mat(np.array([7, 8, 9]))
+    >>> to_transl_mat(np.array([7, 8, 9]))
     array([[1, 0, 0, 7],
            [0, 1, 0, 8],
            [0, 0, 1, 9],
@@ -108,6 +108,31 @@ def to_transl_mat(vec):
     mat = np.identity(4)
     mat[:-1,-1:] = vec.reshape(3,1)
     return mat
+
+def to_scale_mat(vec):
+    return np.identity(vec.shape[0]) * vec
+
+def euler_to_rot_mat(euler):
+    """
+    euler_to_rot_mat(euler)
+    Return a 3D rotation matrix for a given vector of euler rotations
+
+    Parameters
+    ----------
+    euler : numpy.ndarray
+        3D vector with rotation along X, Y, Z axes respectively in degrees
+
+    Returns
+    -------
+    mat : numpy.ndarray
+        3x3 Rotation Matrix
+    """
+    theta = np.radians(euler)
+    cx, cy, cz = np.cos(theta)
+    sx, sy, sz = np.sin(theta)
+    return np.array([[cz*cy, cz*sy*sx - sz*cx, cz*sy*cx + sz*sx],
+                     [sz*cy, sz*sy*sx + cz*cx, sz*sy*cx - cz*sx],
+                     [-sy,   cy*sx,            cy*cx]])
 
 def append_row_and_col(mat):
     """
@@ -173,6 +198,26 @@ def transf_point(mat, point):
         Copy of 'point' with transformed coordinates.
     """
     return (mat @ np.append(point, 1))[:3]
+
+def transf_dist(mat, dist):
+    """
+    transf_point(mat, point)
+    Apply a transformation matrix to a distance vector.
+
+    Parameters
+    ----------
+    mat : numpy.ndarray
+        4x4 transformation matrix to apply.
+    point : numpy.ndarray
+        3D vector of distance to transform.
+
+    Returns
+    -------
+    verts : numpy.ndarray
+        Copy of 'dist' with transformed coordinates.
+    """
+    return mat[:3,:3] @ dist
+
 
 def get_bounds_and_center(verts):
     """
