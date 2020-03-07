@@ -41,6 +41,10 @@ class AlignBounds(bpy.types.Operator):
     rotation_offset: bpy.props.FloatVectorProperty(
         name = "Rotation Offset",
         description = "Rotational offset from source to target",
+        subtype = 'EULER',
+        step = 9000.0,          # 90 deg
+        soft_min = -4.71239,    # -270 deg in rad
+        soft_max = 4.71239,     # 270 deg in rad
     )
 
     @classmethod
@@ -59,41 +63,56 @@ class AlignBounds(bpy.types.Operator):
     def execute(self, context):
         # TARGET
         target = context.object
+        euler_target = target.matrix_world.to_euler()
 
         if target.data.is_editmode:
             # ensure newest changes from edit mode are visible to data
             target.update_from_editmode()
 
+            # get selected vertices in target
             sel_flags_target = get_vert_sel_flags(target)
             verts_target = get_verts(target)
             verts_target = verts_target[sel_flags_target]
-
-            if len(verts_target) < 2:
-                self.report({'ERROR_INVALID_INPUT'},
-                            "Select at least 2 vertices")
-                return {'CANCELLED'}
         else:
-            verts_target = np.array(target.bound_box)
+            rot_target = np.array(euler_target)
+
+            # If we align to axes and the target is rotated, we can't use
+            # Blender's bounding box. Instead, we have to find the global
+            # bounds from all global vertex positions.
+            # This is because for a rotated object, the global bounds of its
+            # local bounding box aren't always equal to the global bounds of
+            # all its vertices.
+            # If we don't align to axes, we aren't interested in the global
+            # target bounds anyway.
+            verts_target = get_verts(target) \
+                if self.align_to_axes \
+                and rot_target.dot(rot_target) > 0.001 \
+                else np.array(target.bound_box)
+
+        if len(verts_target) < 2:
+            self.report({'ERROR_INVALID_INPUT'},
+                        "Select at least 2 vertices")
+            return {'CANCELLED'}
 
         mat_world_target = np.array(target.matrix_world)
 
         if self.align_to_axes:
-            # if we align sources to world axes, we are interested in the
-            # target bounds in world coordinates
+            # If we align sources to world axes, we are interested in the
+            # target bounds in world coordinates.
             verts_target = transf_verts(mat_world_target, verts_target)
-            # if we align sources to axes, we ignore target's rotation
+            # If we align sources to axes, we ignore target's rotation.
             rot_mat_target = np.identity(3)
 
         bounds_target, center_target = get_bounds_and_center(verts_target)
 
         if not self.align_to_axes:
-            # even though we want the target bounds in object space if align
+            # Even though we want the target bounds in object space if align
             # to axes is false, we still are interested in world scale and
-            # center
+            # center.
             bounds_target *= np.array(target.matrix_world.to_scale())
             center_target = transf_point(mat_world_target, center_target)
             # target rotation to later apply to all sources
-            rot_mat_target = np.array(target.matrix_world.to_euler().to_matrix())
+            rot_mat_target = np.array(euler_target.to_matrix())
 
         # SOURCE
         error_happened = False
@@ -102,6 +121,7 @@ class AlignBounds(bpy.types.Operator):
                 continue
 
             if source.data.is_editmode:
+                # get selected vertices in source
                 source.update_from_editmode()
                 all_verts_source = get_verts(source)
                 sel_flags_source = get_vert_sel_flags(source)
@@ -144,17 +164,6 @@ class AlignBounds(bpy.types.Operator):
         if error_happened:
             self.report({'ERROR_INVALID_INPUT'},
                         "Select at least 2 vertices per selected source object")
-
-        # DELETION
-        if self.delete_target:
-            if target.data.is_editmode:
-                bm = bmesh.from_edit_mesh(target.data)
-                del_verts = np.array(bm.verts)[sel_flags_target]
-                bmesh.ops.delete(bm, geom=del_verts.tolist(), context='VERTS')
-                bmesh.update_edit_mesh(target.data)
-            else:
-                bpy.data.objects.remove(target)
-
         return {'FINISHED'}
 
 def draw_menu(self, context):

@@ -112,22 +112,21 @@ def to_transl_mat(vec):
 def to_scale_mat(vec):
     return np.identity(vec.shape[0]) * vec
 
-def euler_to_rot_mat(euler):
+def euler_to_rot_mat(theta):
     """
-    euler_to_rot_mat(euler)
-    Return a 3D rotation matrix for a given vector of euler rotations
+    euler_to_rot_mat(theta)
+    Return a 3D rotation matrix for a given vector of angles in radians
 
     Parameters
     ----------
-    euler : numpy.ndarray
-        3D vector with rotation along X, Y, Z axes respectively in degrees
+    theta : numpy.ndarray
+        3D vector with rotation along X, Y, Z axes respectively in radians
 
     Returns
     -------
     mat : numpy.ndarray
         3x3 Rotation Matrix
     """
-    theta = np.radians(euler)
     cx, cy, cz = np.cos(theta)
     sx, sy, sz = np.sin(theta)
     return np.array([[cz*cy, cz*sy*sx - sz*cx, cz*sy*cx + sz*sx],
