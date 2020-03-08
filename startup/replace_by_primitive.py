@@ -2,6 +2,7 @@ import bpy
 import mathutils as mu
 import numpy as np
 import os
+import statistics as st
 import sys
 
 # make sure blender sees custom modules
@@ -32,10 +33,23 @@ class ReplaceByPrimitive(bpy.types.Operator):
         description = "By which geometric primitive should the selected object/vertices be replaced?",
         items = (
             ('CUBOID', "Cuboid", "Replace selected object by a cuboid"),
-            ('CYLINDER', "Cylinder", "Replace selected object by a cylinder"),
+            ('CYLINDER_Z', "Cylinder Z", "Replace selected object by a cylinder in Z direction"),
+            ('CYLINDER_Y', "Cylinder Y", "Replace selected object by a cylinder in Y direction"),
+            ('CYLINDER_X', "Cylinder X", "Replace selected object by a cylinder in X direction"),
             ('SPHERE', "Sphere", "Replace selected object by a UV-sphere")
         ),
         default = 'CUBOID',
+    )
+
+    fit_metric: bpy.props.EnumProperty(
+        name = "Fit Metric",
+        description = "Metric used to fit the primitive to the object",
+        items = (
+            ('MIN', "Minimum", "The primitive is inside the object's bounds for certain, but may be smaller"),
+            ('MAX', "Maximum", "The primitive's bounds enclose the object's bounds for certain, but may be bigger"),
+            ('AVG', "Average", "Blend between Min and Max metric"),
+        ),
+        default = 'MAX',
     )
 
     resolution: bpy.props.IntProperty(
@@ -54,7 +68,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
     delete_original: bpy.props.BoolProperty(
         name = "Delete Original",
         description = "Delete selected object/vertices after operation finished",
-        default = True,
+        default = False,
     )
 
     @classmethod
@@ -71,6 +85,13 @@ class ReplaceByPrimitive(bpy.types.Operator):
     def execute(self, context):
         target = context.object
         rotation = target.matrix_world.to_euler()
+
+        if self.fit_metric == 'MIN':
+            metric = min
+        elif self.fit_metric == 'MAX':
+            metric = max
+        else:
+            metric= st.mean
 
         if target.data.is_editmode:
             # ensure newest changes from edit mode are visible to data
@@ -125,11 +146,29 @@ class ReplaceByPrimitive(bpy.types.Operator):
             else:
                 bpy.data.objects.remove(target)
 
-        if self.replace_by == 'CYLINDER':
+        if self.replace_by == 'CYLINDER_Z':
             bpy.ops.mesh.primitive_cylinder_add(
                 vertices=self.resolution,
-                radius=max(bounds[:2]) * 0.5,
+                radius=metric(bounds[:2]) * 0.5,
                 depth=bounds[2],
+                end_fill_type='TRIFAN',
+                location=center,
+                rotation=rotation)
+        elif self.replace_by == 'CYLINDER_Y':
+            rotation.rotate(mu.Euler((1.57, 0.0, 0.0)))
+            bpy.ops.mesh.primitive_cylinder_add(
+                vertices=self.resolution,
+                radius=metric(bounds[::2]) * 0.5,
+                depth=bounds[1],
+                end_fill_type='TRIFAN',
+                location=center,
+                rotation=rotation)
+        elif self.replace_by == 'CYLINDER_X':
+            rotation.rotate(mu.Euler((0.0, 1.57, 0.0)))
+            bpy.ops.mesh.primitive_cylinder_add(
+                vertices=self.resolution,
+                radius=metric(bounds[1:]) * 0.5,
+                depth=bounds[0],
                 end_fill_type='TRIFAN',
                 location=center,
                 rotation=rotation)
@@ -145,7 +184,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
             bpy.ops.mesh.primitive_uv_sphere_add(
                 segments=self.resolution * 2,
                 ring_count=self.resolution,
-                radius=max(bounds) * 0.5,
+                radius=metric(bounds) * 0.5,
                 location=center,
                 rotation=rotation)
 
