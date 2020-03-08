@@ -3,7 +3,6 @@ import mathutils as mu
 import numpy as np
 import os
 import sys
-from bpy_extras.object_utils import AddObjectHelper
 
 # make sure blender sees custom modules
 dir = os.path.join(bpy.utils.script_path_pref(), 'modules')

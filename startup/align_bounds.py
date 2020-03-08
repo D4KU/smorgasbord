@@ -1,4 +1,3 @@
-import bmesh
 import bpy
 import mathutils as mu
 import numpy as np
@@ -31,11 +30,6 @@ class AlignBounds(bpy.types.Operator):
     align_to_axes: bpy.props.BoolProperty(
         name = "Align to Axes",
         description = "Align the source objects/vertices to the world axes instead of the target object rotation",
-    )
-
-    delete_target: bpy.props.BoolProperty(
-        name = "Delete Target",
-        description = "Delete target object/vertices after operation finished",
     )
 
     rotation_offset: bpy.props.FloatVectorProperty(
