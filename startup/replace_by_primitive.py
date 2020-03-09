@@ -27,6 +27,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
         bpy.types.VIEW3D_MT_transform_object,
         bpy.types.VIEW3D_MT_transform
     ]
+    metric = max
 
     replace_by: bpy.props.EnumProperty(
         name = "Replace By",
@@ -78,115 +79,111 @@ class ReplaceByPrimitive(bpy.types.Operator):
         else:
             return cls.bl_description
 
-    @classmethod
-    def poll(cls, context):
-        return context.object is not None
-
     def execute(self, context):
-        target = context.object
-        rotation = target.matrix_world.to_euler()
-
         if self.fit_metric == 'MIN':
-            metric = min
+            self.metric = min
         elif self.fit_metric == 'MAX':
-            metric = max
+            self.metric = max
         else:
-            metric= st.mean
+            self.metric = st.mean
 
-        if target.data.is_editmode:
-            # ensure newest changes from edit mode are visible to data
-            target.update_from_editmode()
+        for target in context.selected_objects:
+            rotation = target.matrix_world.to_euler()
 
-            # get selected vertices in target
-            sel_flags_target = get_vert_sel_flags(target)
-            verts_target = get_verts(target)
-            verts_target = verts_target[sel_flags_target]
-        else:
-            rot_target = np.array(rotation)
-
-            # If we align to axes and the target is rotated, we can't use
-            # Blender's bounding box. Instead, we have to find the global
-            # bounds from all global vertex positions.
-            # This is because for a rotated object, the global bounds of its
-            # local bounding box aren't always equal to the global bounds of
-            # all its vertices.
-            # If we don't align to axes, we aren't interested in the global
-            # target bounds anyway.
-            verts_target = get_verts(target) \
-                if self.align_to_axes \
-                and rot_target.dot(rot_target) > 0.001 \
-                else np.array(target.bound_box)
-
-        if len(verts_target) < 2:
-            self.report({'ERROR_INVALID_INPUT'},
-                        "Select at least 2 vertices")
-            return {'CANCELLED'}
-
-        mat_world_target = np.array(target.matrix_world)
-
-        if self.align_to_axes:
-            # If we align sources to world axes, we are interested in the
-            # target bounds in world coordinates.
-            verts_target = transf_verts(mat_world_target, verts_target)
-            # If we align sources to axes, we ignore target's rotation.
-            rotation = mu.Euler()
-
-        bounds, center = get_bounds_and_center(verts_target)
-
-        if not self.align_to_axes:
-            # Even though we want the target bounds in object space if align
-            # to axes is false, we still are interested in world scale and
-            # center.
-            bounds *= np.array(target.matrix_world.to_scale())
-            center = transf_point(mat_world_target, center)
-
-        if self.delete_original:
             if target.data.is_editmode:
-                bpy.ops.mesh.delete()
-            else:
-                bpy.data.objects.remove(target)
+                # ensure newest changes from edit mode are visible to data
+                target.update_from_editmode()
 
-        if self.replace_by == 'CYLINDER_Z':
-            bpy.ops.mesh.primitive_cylinder_add(
-                vertices=self.resolution,
-                radius=metric(bounds[:2]) * 0.5,
-                depth=bounds[2],
-                end_fill_type='TRIFAN',
-                location=center,
-                rotation=rotation)
-        elif self.replace_by == 'CYLINDER_Y':
-            rotation.rotate(mu.Euler((1.57, 0.0, 0.0)))
-            bpy.ops.mesh.primitive_cylinder_add(
-                vertices=self.resolution,
-                radius=metric(bounds[::2]) * 0.5,
-                depth=bounds[1],
-                end_fill_type='TRIFAN',
-                location=center,
-                rotation=rotation)
-        elif self.replace_by == 'CYLINDER_X':
-            rotation.rotate(mu.Euler((0.0, 1.57, 0.0)))
-            bpy.ops.mesh.primitive_cylinder_add(
-                vertices=self.resolution,
-                radius=metric(bounds[1:]) * 0.5,
-                depth=bounds[0],
-                end_fill_type='TRIFAN',
-                location=center,
-                rotation=rotation)
-        elif self.replace_by == 'CUBOID':
-            bpy.ops.mesh.primitive_cube_add(
-                size=1,
-                location=center,
-                rotation=rotation)
-            bpy.ops.transform.resize(
-                value=bounds,
-                orient_type='GLOBAL' if self.align_to_axes else 'LOCAL')
-        elif self.replace_by == 'SPHERE':
-            bpy.ops.mesh.primitive_uv_sphere_add(
-                segments=self.resolution * 2,
-                ring_count=self.resolution,
-                radius=metric(bounds) * 0.5,
-                location=center,
-                rotation=rotation)
+                # get selected vertices in target
+                sel_flags_target = get_vert_sel_flags(target)
+                verts_target = get_verts(target)
+                verts_target = verts_target[sel_flags_target]
+            else:
+                rot_target = np.array(rotation)
+
+                # If we align to axes and the target is rotated, we can't use
+                # Blender's bounding box. Instead, we have to find the global
+                # bounds from all global vertex positions.
+                # This is because for a rotated object, the global bounds of its
+                # local bounding box aren't always equal to the global bounds of
+                # all its vertices.
+                # If we don't align to axes, we aren't interested in the global
+                # target bounds anyway.
+                verts_target = get_verts(target) \
+                    if self.align_to_axes \
+                    and rot_target.dot(rot_target) > 0.001 \
+                    else np.array(target.bound_box)
+
+            if len(verts_target) < 2:
+                self.report({'ERROR_INVALID_INPUT'},
+                            "Select at least 2 vertices")
+                return {'CANCELLED'}
+
+            mat_world_target = np.array(target.matrix_world)
+
+            if self.align_to_axes:
+                # If we align sources to world axes, we are interested in the
+                # target bounds in world coordinates.
+                verts_target = transf_verts(mat_world_target, verts_target)
+                # If we align sources to axes, we ignore target's rotation.
+                rotation = mu.Euler()
+
+            bounds, center = get_bounds_and_center(verts_target)
+
+            if not self.align_to_axes:
+                # Even though we want the target bounds in object space if align
+                # to axes is false, we still are interested in world scale and
+                # center.
+                bounds *= np.array(target.matrix_world.to_scale())
+                center = transf_point(mat_world_target, center)
+
+            if self.delete_original:
+                if target.data.is_editmode:
+                    bpy.ops.mesh.delete()
+                else:
+                    bpy.data.objects.remove(target)
+
+            if self.replace_by == 'CYLINDER_Z':
+                bpy.ops.mesh.primitive_cylinder_add(
+                    vertices=self.resolution,
+                    radius=self.metric(bounds[:2]) * 0.5,
+                    depth=bounds[2],
+                    end_fill_type='TRIFAN',
+                    location=center,
+                    rotation=rotation)
+            elif self.replace_by == 'CYLINDER_Y':
+                rotation.rotate(mu.Euler((1.57, 0.0, 0.0)))
+                bpy.ops.mesh.primitive_cylinder_add(
+                    vertices=self.resolution,
+                    radius=self.metric(bounds[::2]) * 0.5,
+                    depth=bounds[1],
+                    end_fill_type='TRIFAN',
+                    location=center,
+                    rotation=rotation)
+            elif self.replace_by == 'CYLINDER_X':
+                rotation.rotate(mu.Euler((0.0, 1.57, 0.0)))
+                bpy.ops.mesh.primitive_cylinder_add(
+                    vertices=self.resolution,
+                    radius=self.metric(bounds[1:]) * 0.5,
+                    depth=bounds[0],
+                    end_fill_type='TRIFAN',
+                    location=center,
+                    rotation=rotation)
+            elif self.replace_by == 'CUBOID':
+                bpy.ops.mesh.primitive_cube_add(
+                    size=1,
+                    location=center,
+                    rotation=rotation)
+                bpy.ops.transform.resize(
+                    value=bounds,
+                    orient_type='GLOBAL' if self.align_to_axes else 'LOCAL')
+            elif self.replace_by == 'SPHERE':
+                bpy.ops.mesh.primitive_uv_sphere_add(
+                    segments=self.resolution * 2,
+                    ring_count=self.resolution,
+                    radius=self.metric(bounds) * 0.5,
+                    location=center,
+                    rotation=rotation)
 
         return {'FINISHED'}
 
