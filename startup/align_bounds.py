@@ -52,7 +52,8 @@ class AlignBounds(bpy.types.Operator):
     def poll(cls, context):
         a = context.object is not None
         b = len(context.selected_objects) >= 2
-        return a and b
+        c = context.object.type == 'MESH'
+        return a and b and c
 
     def execute(self, context):
         # TARGET
@@ -112,6 +113,9 @@ class AlignBounds(bpy.types.Operator):
         error_happened = False
         for source in context.selected_objects:
             if source is target:
+                continue
+
+            if source.type != 'MESH':
                 continue
 
             if source.data.is_editmode:

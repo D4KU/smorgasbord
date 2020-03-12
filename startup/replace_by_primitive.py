@@ -88,6 +88,9 @@ class ReplaceByPrimitive(bpy.types.Operator):
             self.metric = st.mean
 
         for target in context.selected_objects:
+            if target.type != 'MESH':
+                continue
+
             rotation = target.matrix_world.to_euler()
 
             if target.data.is_editmode:
