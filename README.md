@@ -28,6 +28,7 @@ registration method, an object's apparent rotation can only be matched if it
 is still accessible via the object's properties and wasn't already applied
 directly to the mesh data.
 
+![](https://github.com/D4KU/BlenderScripts/blob/master/media/ReplaceByPrimitive.gif)
 
 ### Align Bounds
 
@@ -46,6 +47,8 @@ The method ignores pivot points and instead matches the bounding box centers
 of all meshes/vertex selections. This, and the fact that also rotation and
 scale are aligned, distinguishes this method from the built-in `Align Objects`
 Blender function.
+
+![](https://github.com/D4KU/BlenderScripts/blob/master/media/AlignBounds.gif)
 
 
 ### Set Parent Advanced 
@@ -88,5 +91,5 @@ with, or ends with a given phrase.
 
 A crude script that applies a rotation and scaling to every selected object to
 transform the coordinate system and units used in Blender to those used in the
-Unity Game Engine. This script uses the "Apply Transform" function, which
+Unity Game Engine. This script uses the `Apply Transform` function, which
 makes it destructive and fail on shared mesh data.
