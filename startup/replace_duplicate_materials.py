@@ -9,6 +9,7 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
     bl_description = "Tries to replace materials of selected objects by their original through name matching. E.g. Metal.001 would be replaced by Metal, if existent"
     bl_options = {'REGISTER', 'UNDO'}
     menus = [
+        bpy.types.MATERIAL_MT_context_menu
     ]
 
     pattern: bpy.props.StringProperty(

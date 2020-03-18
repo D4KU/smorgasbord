@@ -85,6 +85,19 @@ Select all objects in the scene whose name either contains, equals, starts
 with, or ends with a given phrase.
 
 
+### Replace Duplicate Materials
+
+`Material Properties > Material Context Menu (v-shape under minus-sign)`
+
+For every selected object's material slot, try to replace all assigned
+duplicate materials with their original by comparing their names. A regular
+expression, which can be passed to the function as input, specifies how
+material names are matched. The default expression, `.*(?=\.[0-9]+)`, replaces
+a material with a suffix containing a dot and a number by the corresponding
+material without such a suffix, if such a material exists. For example,
+*Plastic_black.001* would be replaced by *Plastic_black*, if existent.
+
+
 ### Prepare Export to Unity
 
 `Object > Transform > Prepare Export to Unity`
