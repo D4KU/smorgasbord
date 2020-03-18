@@ -27,6 +27,7 @@ class SetParentAdvanced(bpy.types.Operator):
 
     def execute(self, context):
         parent = context.object
+        par_mat_world_inv = parent.matrix_world.inverted()
         par_mat_local_inv = parent.matrix_local.inverted()
 
         if self.op_type == 'NO_INVERSE_KEEP_TRANSFORM':
@@ -34,7 +35,7 @@ class SetParentAdvanced(bpy.types.Operator):
                 if child == parent:
                     continue
                 child.parent = parent
-                child.matrix_basis = par_mat_local_inv @ child.matrix_basis
+                child.matrix_basis = par_mat_world_inv @ child.matrix_basis
         elif self.op_type == 'NO_INVERSE_KEEP_BASIS':
             for child in context.selected_objects:
                 if child == parent:
