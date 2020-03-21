@@ -30,6 +30,7 @@ directly to the mesh data.
 
 ![](https://github.com/D4KU/BlenderScripts/blob/master/media/ReplaceByPrimitive.gif)
 
+
 ### Align Bounds
 
 In Object Mode: `Object > Transform > Align Bounds`
@@ -49,6 +50,15 @@ scale are aligned, distinguishes this method from the built-in `Align Objects`
 Blender function.
 
 ![](https://github.com/D4KU/BlenderScripts/blob/master/media/AlignBounds.gif)
+
+
+### Select Loose by Size
+
+In Edit Mode: `Select > Select Loose by Size` 
+
+Select loose parts in the currently edited meshes whose bounding box volume is
+greater than a given minimum threshold and less or equal than a given maximum
+threshold.
 
 
 ### Set Parent Advanced 
