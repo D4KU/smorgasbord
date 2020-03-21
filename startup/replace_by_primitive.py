@@ -73,6 +73,10 @@ class ReplaceByPrimitive(bpy.types.Operator):
     )
 
     @classmethod
+    def poll(cls, context):
+        return len(context.selected_objects) > 0
+
+    @classmethod
     def description(cls, context, properties):
         if context.mode == 'EDIT_MESH':
             return "Replace selected vertices by a geometric primitive with identical transform as the active object"
@@ -87,8 +91,12 @@ class ReplaceByPrimitive(bpy.types.Operator):
         else:
             self.metric = st.mean
 
+        all_type_err = True # no obj is of type mesh
+
         for target in context.selected_objects:
-            if target.type != 'MESH':
+            if target.type == 'MESH':
+                all_type_err = False
+            else:
                 continue
 
             rotation = target.matrix_world.to_euler()
@@ -188,6 +196,10 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     location=center,
                     rotation=rotation)
 
+        if all_type_err:
+            self.report({'ERROR_INVALID_INPUT'},
+                        "An object must be of type mesh")
+            return {'CANCELLED'}
         return {'FINISHED'}
 
 def draw_menu(self, context):

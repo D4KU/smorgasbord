@@ -10,6 +10,10 @@ class ApplyName(bpy.types.Operator):
          bpy.types.VIEW3D_MT_object_apply
     ]
 
+    @classmethod
+    def poll(cls, context):
+        return len(context.selected_objects) > 0
+
     def execute(self, context):
         for o in context.selected_objects:
             o.data.name = o.name

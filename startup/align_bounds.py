@@ -50,10 +50,12 @@ class AlignBounds(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        a = context.object is not None
-        b = len(context.selected_objects) >= 2
-        c = context.object.type == 'MESH'
-        return a and b and c
+        if context.object is None:
+            return False
+
+        a = len(context.selected_objects) > 1
+        b = context.object.type == 'MESH'
+        return a and b
 
     def execute(self, context):
         # TARGET
