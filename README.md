@@ -27,7 +27,7 @@ registration method, an object's apparent rotation can only be matched if it
 is still accessible via the object's properties and wasn't already applied
 directly to the mesh data.
 
-![](https://github.com/D4KU/BlenderScripts/blob/master/media/ReplaceByPrimitive.gif)
+![](https://github.com/D4KU/smorgasbord/blob/master/media/ReplaceByPrimitive.gif)
 
 
 ### Align Bounds
@@ -48,7 +48,7 @@ of all meshes/vertex selections. This, and the fact that also rotation and
 scale are aligned, distinguishes this method from the built-in `Align Objects`
 Blender function.
 
-![](https://github.com/D4KU/BlenderScripts/blob/master/media/AlignBounds.gif)
+![](https://github.com/D4KU/smorgasbord/blob/master/media/AlignBounds.gif)
 
 
 ### Select Loose by Size
