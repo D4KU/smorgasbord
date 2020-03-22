@@ -1,20 +1,7 @@
 import bpy
+import BlenderScripts.functions.common as bs
 import mathutils as mu
 import numpy as np
-import os
-import sys
-
-# make sure blender sees custom modules
-dir = os.path.join(bpy.utils.script_path_pref(), 'modules')
-if not dir in sys.path:
-    sys.path.append(dir)
-
-import common
-# force reload in case source was edited after blender session started
-import imp
-imp.reload(common)
-# optional
-from common import *
 
 
 class AlignBounds(bpy.types.Operator):
@@ -67,8 +54,8 @@ class AlignBounds(bpy.types.Operator):
             target.update_from_editmode()
 
             # get selected vertices in target
-            sel_flags_target = get_vert_sel_flags(target)
-            verts_target = get_verts(target)
+            sel_flags_target = bs.get_vert_sel_flags(target)
+            verts_target = bs.get_verts(target)
             verts_target = verts_target[sel_flags_target]
         else:
             rot_target = np.array(euler_target)
@@ -81,7 +68,7 @@ class AlignBounds(bpy.types.Operator):
             # all its vertices.
             # If we don't align to axes, we aren't interested in the global
             # target bounds anyway.
-            verts_target = get_verts(target) \
+            verts_target = bs.get_verts(target) \
                 if self.align_to_axes \
                 and rot_target.dot(rot_target) > 0.001 \
                 else np.array(target.bound_box)
@@ -96,18 +83,18 @@ class AlignBounds(bpy.types.Operator):
         if self.align_to_axes:
             # If we align sources to world axes, we are interested in the
             # target bounds in world coordinates.
-            verts_target = transf_verts(mat_world_target, verts_target)
+            verts_target = bs.transf_verts(mat_world_target, verts_target)
             # If we align sources to axes, we ignore target's rotation.
             rot_mat_target = np.identity(3)
 
-        bounds_target, center_target = get_bounds_and_center(verts_target)
+        bounds_target, center_target = bs.get_bounds_and_center(verts_target)
 
         if not self.align_to_axes:
             # Even though we want the target bounds in object space if align
             # to axes is false, we still are interested in world scale and
             # center.
             bounds_target *= np.array(target.matrix_world.to_scale())
-            center_target = transf_point(mat_world_target, center_target)
+            center_target = bs.transf_point(mat_world_target, center_target)
             # target rotation to later apply to all sources
             rot_mat_target = np.array(euler_target.to_matrix())
 
@@ -123,8 +110,8 @@ class AlignBounds(bpy.types.Operator):
             if source.data.is_editmode:
                 # get selected vertices in source
                 source.update_from_editmode()
-                all_verts_source = get_verts(source)
-                sel_flags_source = get_vert_sel_flags(source)
+                all_verts_source = bs.get_verts(source)
+                sel_flags_source = bs.get_vert_sel_flags(source)
                 sel_verts_source = all_verts_source[sel_flags_source]
 
                 if len(sel_verts_source) < 2:
@@ -133,20 +120,20 @@ class AlignBounds(bpy.types.Operator):
             else:
                 sel_verts_source = np.array(source.bound_box)
 
-            bounds_source, center_source = get_bounds_and_center(sel_verts_source)
+            bounds_source, center_source = bs.get_bounds_and_center(sel_verts_source)
 
             # prevent division by 0
             bounds_source[bounds_source == 0] = 1
 
             # assemble transformation matrix later applied to source
             transf_mat = \
-                to_transl_mat(center_target) @ \
-                append_row_and_col( \
+                bs.to_transl_mat(center_target) @ \
+                bs.append_row_and_col( \
                     rot_mat_target @ \
-                    to_scale_mat(bounds_target) @ \
-                    euler_to_rot_mat(np.array(self.rotation_offset)) @ \
-                    to_scale_mat(1 / bounds_source)) @ \
-                to_transl_mat(-center_source)
+                    bs.to_scale_mat(bounds_target) @ \
+                    bs.euler_to_rot_mat(np.array(self.rotation_offset)) @ \
+                    bs.to_scale_mat(1 / bounds_source)) @ \
+                bs.to_transl_mat(-center_source)
 
             if source.data.is_editmode:
                 # somehow the mesh doesn't update if we stay in edit mode
@@ -154,9 +141,9 @@ class AlignBounds(bpy.types.Operator):
                 # transform transformation matrix from world to object space
                 transf_mat = np.array(source.matrix_world.inverted()) @ transf_mat
                 # update every selected vertex with transformed coordinates
-                all_verts_source[sel_flags_source] = transf_verts(transf_mat, sel_verts_source)
+                all_verts_source[sel_flags_source] = bs.transf_verts(transf_mat, sel_verts_source)
                 # overwrite complete vertex list (also non-selected)
-                set_verts(source, all_verts_source)
+                bs.set_verts(source, all_verts_source)
                 bpy.ops.object.mode_set(mode='EDIT')
             else:
                 source.matrix_world = mu.Matrix(transf_mat)

@@ -217,7 +217,6 @@ def transf_dist(mat, dist):
     """
     return mat[:3,:3] @ dist
 
-
 def get_bounds_and_center(verts):
     """
     get_bounds_and_center(verts)
@@ -242,3 +241,6 @@ def get_bounds_and_center(verts):
     bounds = co_max - co_min
     center = (co_max + co_min) * 0.5
     return bounds, center
+
+def clamp(val, minv, maxv):
+    return max(min(val, maxv), minv)

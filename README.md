@@ -4,12 +4,11 @@ to make my life easier. I hope they do so for someone else as well.
 
 # Installation
 
-After downloading or cloning this repository, open Blender and navigate to
-`Edit > Preferences > File Paths` to set the *Scripts* data path to the
-downloaded *BlenderScripts* directory. If you already have a *Scripts* path
-set, copy the downloaded content under *startup* into your *startup* directory
-and the content under *modules* into your *modules* directory. Restart
-Blender. Enjoy!
+In Blender, navigate to `Edit > Preferences > Add-ons` and hit the *Install*
+button. If you downloaded this repository as a zip file, select that. If you
+cloned it, select the __init__.py file in the Add-ons' root directory. After
+you hit *Install Add-on*, make sure to tick the Add-on in the list and save
+your preferences. Enjoy!
 
 
 # Content

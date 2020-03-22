@@ -1,23 +1,8 @@
-import time
-import pdb
 import bmesh as bm
+import BlenderScripts.functions.common as bs
 import bpy
 import mathutils as mu
 import numpy as np
-import os
-import sys
-
-# make sure blender sees custom modules
-dir = os.path.join(bpy.utils.script_path_pref(), 'modules')
-if not dir in sys.path:
-    sys.path.append(dir)
-
-import common
-# force reload in case source was edited after blender session started
-import imp
-imp.reload(common)
-# optional
-from common import *
 
 
 class SelectLooseBySize(bpy.types.Operator):
@@ -108,7 +93,7 @@ class SelectLooseBySize(bpy.types.Operator):
 
             # 2. select small enough loose parts
             for indcs, coords in parts:
-                bounds, _ = get_bounds_and_center(coords)
+                bounds, _ = bs.get_bounds_and_center(coords)
                 vol = np.prod(bounds)
 
                 # only select loose parts with right volume

@@ -1,6 +1,7 @@
 import bpy
 import mathutils as mu
 
+
 class SetParentAdvanced(bpy.types.Operator):
     bl_idname = "object.set_parent_advanced"
     bl_label = "Set Parent Advanced"
