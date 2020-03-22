@@ -1,6 +1,6 @@
 import sys
 
-from BlenderScripts.operators import (
+from smorgasbord.operators import (
     align_bounds,
     apply_name,
     prepare_export_to_unity,
@@ -13,15 +13,15 @@ from BlenderScripts.operators import (
 
 
 bl_info = {
-    "name": "Blender Scripts",
+    "name": "Smorgasbord",
     "author": "David Kutschke",
     "category": "Object",
     "version": (0, 1, 0),
     "blender": (2, 82, 0),
     "location": "View 3D",
-    "description": "Tools that make by life easier.",
+    "description": "A variety of operators to make your life easier. Tasty like a smorgas.",
     "warning": "",
-    "wiki_url": "https://github.com/D4KU/BlenderScripts",
+    "wiki_url": "https://github.com/D4KU/smorgasbord",
 }
 
 
@@ -44,7 +44,7 @@ def register():
 
 def unregister():
     _call_globals("unregister")
-    _flush_modules("BlenderScripts")
+    _flush_modules("smorgasbord")
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 import bpy
-import BlenderScripts.functions.common as bs
+import smorgasbord.functions.common as sb
 import mathutils as mu
 import numpy as np
 import statistics as st
@@ -93,8 +93,8 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 target.update_from_editmode()
 
                 # get selected vertices in target
-                sel_flags_target = bs.get_vert_sel_flags(target)
-                verts_target = bs.get_verts(target)
+                sel_flags_target = sb.get_vert_sel_flags(target)
+                verts_target = sb.get_verts(target)
                 verts_target = verts_target[sel_flags_target]
             else:
                 rot_target = np.array(rotation)
@@ -107,7 +107,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 # all its vertices.
                 # If we don't align to axes, we aren't interested in the global
                 # target bounds anyway.
-                verts_target = bs.get_verts(target) \
+                verts_target = sb.get_verts(target) \
                     if self.align_to_axes \
                     and rot_target.dot(rot_target) > 0.001 \
                     else np.array(target.bound_box)
@@ -122,18 +122,18 @@ class ReplaceByPrimitive(bpy.types.Operator):
             if self.align_to_axes:
                 # If we align sources to world axes, we are interested in the
                 # target bounds in world coordinates.
-                verts_target = bs.transf_verts(mat_world_target, verts_target)
+                verts_target = sb.transf_verts(mat_world_target, verts_target)
                 # If we align sources to axes, we ignore target's rotation.
                 rotation = mu.Euler()
 
-            bounds, center = bs.get_bounds_and_center(verts_target)
+            bounds, center = sb.get_bounds_and_center(verts_target)
 
             if not self.align_to_axes:
                 # Even though we want the target bounds in object space if align
                 # to axes is false, we still are interested in world scale and
                 # center.
                 bounds *= np.array(target.matrix_world.to_scale())
-                center = bs.transf_point(mat_world_target, center)
+                center = sb.transf_point(mat_world_target, center)
 
             if self.delete_original:
                 if target.data.is_editmode:

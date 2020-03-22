@@ -1,5 +1,5 @@
 import bmesh as bm
-import BlenderScripts.functions.common as bs
+import smorgasbord.functions.common as sb
 import bpy
 import mathutils as mu
 import numpy as np
@@ -38,7 +38,7 @@ class SelectLooseBySize(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.object.mode == 'EDIT'
+        return context.mode == 'EDIT_MESH' and len(context.selected_objects) > 0
 
     def execute(self, context):
         all_type_err = True # no obj is of type mesh
@@ -93,7 +93,7 @@ class SelectLooseBySize(bpy.types.Operator):
 
             # 2. select small enough loose parts
             for indcs, coords in parts:
-                bounds, _ = bs.get_bounds_and_center(coords)
+                bounds, _ = sb.get_bounds_and_center(coords)
                 vol = np.prod(bounds)
 
                 # only select loose parts with right volume
