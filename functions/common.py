@@ -1,4 +1,6 @@
+import bpy
 import numpy as np
+import bmesh as bm
 
 def get_verts(ob):
     """
@@ -112,14 +114,14 @@ def to_transl_mat(vec):
 def to_scale_mat(vec):
     return np.identity(vec.shape[0]) * vec
 
-def euler_to_rot_mat(theta):
+def euler_to_rot_mat(thetas):
     """
-    euler_to_rot_mat(theta)
+    euler_to_rot_mat(thetas)
     Return a 3D rotation matrix for a given vector of angles in radians
 
     Parameters
     ----------
-    theta : numpy.ndarray
+    thetas : numpy.ndarray
         3D vector with rotation along X, Y, Z axes respectively in radians
 
     Returns
@@ -127,11 +129,15 @@ def euler_to_rot_mat(theta):
     mat : numpy.ndarray
         3x3 Rotation Matrix
     """
-    cx, cy, cz = np.cos(theta)
-    sx, sy, sz = np.sin(theta)
+    cx, cy, cz = np.cos(thetas)
+    sx, sy, sz = np.sin(thetas)
     return np.array([[cz*cy, cz*sy*sx - sz*cx, cz*sy*cx + sz*sx],
                      [sz*cy, sz*sy*sx + cz*cx, sz*sy*cx - cz*sx],
                      [-sy,   cy*sx,            cy*cx]])
+
+def make_transf_mat(transl=np.zeros(3), rot=np.zeros(3), scale=np.ones(3)):
+    return to_transl_mat(transl) @ append_row_and_col( \
+        euler_to_rot_mat(rot) @ to_scale_mat(scale))
 
 def append_row_and_col(mat):
     """
@@ -241,6 +247,61 @@ def get_bounds_and_center(verts):
     bounds = co_max - co_min
     center = (co_max + co_min) * 0.5
     return bounds, center
+
+def get_unit_box():
+    """
+    """
+
+    verts = np.array([
+        (+0.5, +0.5, -0.5),
+        (+0.5, -0.5, -0.5),
+        (-0.5, -0.5, -0.5),
+        (-0.5, +0.5, -0.5),
+        (+0.5, +0.5, +0.5),
+        (+0.5, -0.5, +0.5),
+        (-0.5, -0.5, +0.5),
+        (-0.5, +0.5, +0.5),
+    ])
+
+    faces = np.array([
+        (0, 1, 2, 3),
+        (4, 7, 6, 5),
+        (0, 4, 5, 1),
+        (1, 5, 6, 2),
+        (2, 6, 7, 3),
+        (4, 0, 3, 7),
+    ])
+
+    return verts, faces
+
+def add_geom_to_bmesh(bob, verts, faces):
+    for v in verts:
+        print(v)
+        bob.verts.new(v)
+
+    bob.verts.ensure_lookup_table()
+    for f_idx in faces:
+        bob.faces.new([bob.verts[v_idx] for v_idx in f_idx])
+
+def add_box_to_scene(context, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(3), name='Box'):
+    verts, faces = get_unit_box()
+    verts = transf_verts(make_transf_mat(location, rotation, size), verts)
+
+    bob = bm.new()
+    add_geom_to_bmesh(bob, verts, faces)
+
+    mesh = bpy.data.meshes.new(name)
+    bob.to_mesh(mesh)
+    mesh.update()
+
+    # add the mesh as an object into the scene with this utility module
+    from bpy_extras import object_utils
+    object_utils.object_data_add(context, mesh)
+
+def add_box_to_bmesh(bob, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(3)):
+    verts, faces = get_unit_box()
+    verts = transf_verts(make_transf_mat(location, rotation, size), verts)
+    add_geom_to_bmesh(bob, verts, faces)
 
 def clamp(val, minv, maxv):
     return max(min(val, maxv), minv)

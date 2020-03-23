@@ -1,4 +1,5 @@
 import bpy
+import bmesh as bm
 import smorgasbord.functions.common as sb
 import mathutils as mu
 import numpy as np
@@ -59,9 +60,11 @@ class ReplaceByPrimitive(bpy.types.Operator):
         default = False,
     )
 
+
     @classmethod
     def poll(cls, context):
         return len(context.selected_objects) > 0
+
 
     @classmethod
     def description(cls, context, properties):
@@ -69,6 +72,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
             return "Replace selected vertices by a geometric primitive with identical transform as the active object"
         else:
             return cls.bl_description
+
 
     def execute(self, context):
         if self.fit_metric == 'MIN':
@@ -78,68 +82,88 @@ class ReplaceByPrimitive(bpy.types.Operator):
         else:
             self.metric = st.mean
 
-        all_type_err = True # no obj is of type mesh
+        if context.mode == 'EDIT_MESH':
+            verts = np.arange(0, dtype=float)
+            verts.shape = (0, 3)
 
-        for target in context.selected_objects:
-            if target.type == 'MESH':
-                all_type_err = False
-            else:
-                continue
-
-            rotation = target.matrix_world.to_euler()
-
-            if target.data.is_editmode:
+            for o in context.selected_objects:
                 # ensure newest changes from edit mode are visible to data
-                target.update_from_editmode()
+                o.update_from_editmode()
 
-                # get selected vertices in target
-                sel_flags_target = sb.get_vert_sel_flags(target)
-                verts_target = sb.get_verts(target)
-                verts_target = verts_target[sel_flags_target]
-            else:
-                rot_target = np.array(rotation)
+                sel_flags = sb.get_vert_sel_flags(o)
+                verts = np.concatenate((verts, sb.get_verts(o)[sel_flags]))
 
-                # If we align to axes and the target is rotated, we can't use
+            self.core(context, context.object, verts)
+        else:
+            all_type_err = True # no obj is of type mesh
+
+            for o in context.selected_objects:
+                if o.type == 'MESH':
+                    all_type_err = False
+                else:
+                    continue
+
+                rot = np.array(o.matrix_world.to_euler())
+
+                # If we align to axes and the ob is rotated, we can't use
                 # Blender's bounding box. Instead, we have to find the global
                 # bounds from all global vertex positions.
                 # This is because for a rotated object, the global bounds of its
                 # local bounding box aren't always equal to the global bounds of
                 # all its vertices.
                 # If we don't align to axes, we aren't interested in the global
-                # target bounds anyway.
-                verts_target = sb.get_verts(target) \
-                    if self.align_to_axes \
-                    and rot_target.dot(rot_target) > 0.001 \
-                    else np.array(target.bound_box)
+                # ob bounds anyway.
+                verts = sb.get_verts(o) if self.align_to_axes \
+                    and rot.dot(rot) > 0.001 else np.array(o.bound_box)
+                self.core(context, o, verts)
 
-            if len(verts_target) < 2:
+            if all_type_err:
                 self.report({'ERROR_INVALID_INPUT'},
-                            "Select at least 2 vertices")
+                            "An object must be of type mesh")
                 return {'CANCELLED'}
 
-            mat_world_target = np.array(target.matrix_world)
+        return {'FINISHED'}
+
+
+    def core(self, context, ob, verts):
+            if len(verts) < 2:
+                self.report({'ERROR_INVALID_INPUT'},
+                            "Select at least 2 vertices")
+                return
+
+            mat_wrld = np.array(ob.matrix_world)
 
             if self.align_to_axes:
                 # If we align sources to world axes, we are interested in the
-                # target bounds in world coordinates.
-                verts_target = sb.transf_verts(mat_world_target, verts_target)
-                # If we align sources to axes, we ignore target's rotation.
+                # ob bounds in world coordinates.
+                verts = sb.transf_verts(mat_wrld, verts)
+                # If we align sources to axes, we ignore ob's rotation.
                 rotation = mu.Euler()
 
-            bounds, center = sb.get_bounds_and_center(verts_target)
+            bounds, center = sb.get_bounds_and_center(verts)
 
             if not self.align_to_axes:
-                # Even though we want the target bounds in object space if align
+                # Even though we want the ob bounds in object space if align
                 # to axes is false, we still are interested in world scale and
                 # center.
-                bounds *= np.array(target.matrix_world.to_scale())
-                center = sb.transf_point(mat_world_target, center)
+                bounds *= np.array(ob.matrix_world.to_scale())
+                center = sb.transf_point(mat_wrld, center)
+                rotation = ob.matrix_world.to_euler()
 
             if self.delete_original:
-                if target.data.is_editmode:
-                    bpy.ops.mesh.delete()
+                if ob.data.is_editmode:
+                    sel_mode = context.tool_settings.mesh_select_mode
+
+                    if sel_mode[0]:
+                        del_type = 'VERT'
+                    elif sel_mode[1]:
+                        del_type = 'EDGE'
+                    else:
+                        del_type = 'FACE'
+
+                    bpy.ops.mesh.delete(type=del_type)
                 else:
-                    bpy.data.objects.remove(target)
+                    bpy.data.objects.remove(ob)
 
             if self.replace_by == 'CYLINDER_Z':
                 bpy.ops.mesh.primitive_cylinder_add(
@@ -168,13 +192,13 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     location=center,
                     rotation=rotation)
             elif self.replace_by == 'CUBOID':
-                bpy.ops.mesh.primitive_cube_add(
-                    size=1,
-                    location=center,
-                    rotation=rotation)
-                bpy.ops.transform.resize(
-                    value=bounds,
-                    orient_type='GLOBAL' if self.align_to_axes else 'LOCAL')
+                if context.mode == 'EDIT_MESH':
+                    bob = bm.from_edit_mesh(context.object.data)
+                    sb.add_box_to_bmesh(bob, center, rotation, bounds)
+                    bm.update_edit_mesh(context.object.data)
+                else:
+                    # TODO
+                    sb.add_box_to_scene(context, center, rotation, bounds)
             elif self.replace_by == 'SPHERE':
                 bpy.ops.mesh.primitive_uv_sphere_add(
                     segments=self.resolution * 2,
@@ -183,24 +207,22 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     location=center,
                     rotation=rotation)
 
-        if all_type_err:
-            self.report({'ERROR_INVALID_INPUT'},
-                        "An object must be of type mesh")
-            return {'CANCELLED'}
-        return {'FINISHED'}
 
 def draw_menu(self, context):
     self.layout.operator(ReplaceByPrimitive.bl_idname)
+
 
 def register():
     bpy.utils.register_class(ReplaceByPrimitive)
     for m in ReplaceByPrimitive.menus:
         m.append(draw_menu)
 
+
 def unregister():
     bpy.utils.unregister_class(ReplaceByPrimitive)
     for m in ReplaceByPrimitive.menus:
         m.remove(draw_menu)
+
 
 if __name__ == "__main__":
     register()
