@@ -274,14 +274,24 @@ def get_unit_box():
 
     return verts, faces
 
-def add_geom_to_bmesh(bob, verts, faces):
+def deselect_bmesh(bob):
+    for v in bob.verts:
+        v.select = False
+    bob.select_flush_mode()
+
+def add_geom_to_bmesh(bob, verts, faces, select=True):
+    v_offset = len(bob.verts)
     for v in verts:
-        print(v)
-        bob.verts.new(v)
+        vert = bob.verts.new(v)
+        if select:
+            vert.select = True
+
+    if select:
+        bob.select_flush_mode()
 
     bob.verts.ensure_lookup_table()
-    for f_idx in faces:
-        bob.faces.new([bob.verts[v_idx] for v_idx in f_idx])
+    for f in faces:
+        bob.faces.new([bob.verts[v_offset + v_idx] for v_idx in f])
 
 def add_box_to_scene(context, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(3), name='Box'):
     verts, faces = get_unit_box()
@@ -298,10 +308,22 @@ def add_box_to_scene(context, location=np.zeros(3), rotation=np.zeros(3), size=n
     from bpy_extras import object_utils
     object_utils.object_data_add(context, mesh)
 
-def add_box_to_bmesh(bob, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(3)):
+def add_box_to_obj(ob, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(3), select=True):
+    bob = bm.from_edit_mesh(ob.data)
+    # if box should be selected, deselect everything else
+    if select:
+        deselect_bmesh(bob)
+
+    # TODO test if set_verts selection is faster
+
     verts, faces = get_unit_box()
-    verts = transf_verts(make_transf_mat(location, rotation, size), verts)
-    add_geom_to_bmesh(bob, verts, faces)
+    # verts = transf_verts(make_transf_mat(location, rotation, size), verts)
+    mat = np.array(ob.matrix_world.inverted()) @ make_transf_mat(location, rotation, size)
+    print(mat)
+    verts = transf_verts(mat, verts)
+
+    add_geom_to_bmesh(bob, verts, faces, select)
+    bm.update_edit_mesh(ob.data)
 
 def clamp(val, minv, maxv):
     return max(min(val, maxv), minv)

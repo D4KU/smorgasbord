@@ -135,7 +135,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
 
             if self.align_to_axes:
                 # If we align sources to world axes, we are interested in the
-                # ob bounds in world coordinates.
+                # bounds in world coordinates.
                 verts = sb.transf_verts(mat_wrld, verts)
                 # If we align sources to axes, we ignore ob's rotation.
                 rotation = mu.Euler()
@@ -193,11 +193,12 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     rotation=rotation)
             elif self.replace_by == 'CUBOID':
                 if context.mode == 'EDIT_MESH':
-                    bob = bm.from_edit_mesh(context.object.data)
-                    sb.add_box_to_bmesh(bob, center, rotation, bounds)
-                    bm.update_edit_mesh(context.object.data)
+                    # center_local = sb.transf_point(
+                        # np.array(ob.matrix_world.inverted()), center)
+                    # rot_local = sb.transf_point(
+                        # np.array(ob.matrix_world.inverted()), rotation)
+                    sb.add_box_to_obj(ob, center, rotation, bounds)
                 else:
-                    # TODO
                     sb.add_box_to_scene(context, center, rotation, bounds)
             elif self.replace_by == 'SPHERE':
                 bpy.ops.mesh.primitive_uv_sphere_add(
