@@ -313,7 +313,6 @@ def add_geom_to_bmesh(bob, verts, faces, select=True):
         for v in verts:
             # Add new vert and select it
             bverts.new(v).select = True
-        bob.select_flush_mode()
     else:
         for v in verts:
             bverts.new(v)
@@ -322,6 +321,9 @@ def add_geom_to_bmesh(bob, verts, faces, select=True):
     for f in faces:
         # Push list of BVert objects to bfaces that make up face f
         bfaces.new([bverts[v_offset + v_idx] for v_idx in f])
+
+    if select:
+        bob.select_flush_mode()
 
 def add_box_to_scene(context, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(3), name='Box'):
     """
@@ -354,7 +356,13 @@ def add_box_to_scene(context, location=np.zeros(3), rotation=np.zeros(3), size=n
     from bpy_extras import object_utils
     object_utils.object_data_add(context, mesh)
 
-def add_box_to_obj(ob, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(3), select=True):
+def add_box_to_obj(
+        ob,
+        location=np.zeros(3),
+        rotation=np.zeros(3),
+        size=np.ones(3),
+        select=False,
+        deselect=True):
     """
     Add a box mesh to a given Blender object.
 
@@ -375,9 +383,10 @@ def add_box_to_obj(ob, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(
     bob = bm.from_edit_mesh(ob.data)
 
     # If box should be selected, deselect everything else
-    if select:
+    if deselect:
         for v in bob.verts:
             v.select = False
+        bob.select_flush_mode()
 
     verts, faces = get_unit_cube()
 

@@ -1,3 +1,4 @@
+import time
 import pdb
 import bpy
 import bmesh as bm
@@ -88,15 +89,17 @@ class ReplaceByPrimitive(bpy.types.Operator):
         else:
             self.metric = st.mean
 
+        sel_obs = context.selected_objects
+
         if context.mode == 'EDIT_MESH':
             if self.join_select:
                 verts = np.arange(0, dtype=float)
                 verts.shape = (0, 3)
-                ob = context.object
+                ob = context.object if context.object else sel_obs[0]
                 mat_wrld_inv = np.array(ob.matrix_world.inverted())
 
                 # concatenate verts from all selected objects
-                for o in context.selected_objects:
+                for o in sel_obs:
                     # ensure newest changes from edit mode are visible to data
                     o.update_from_editmode()
 
@@ -112,7 +115,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
 
                 self.core(context, ob, verts)
             else:
-                for o in context.selected_objects:
+                for o in sel_obs:
                     o.update_from_editmode()
 
                     sel_flags = sb.get_vert_sel_flags(o)
@@ -124,10 +127,10 @@ class ReplaceByPrimitive(bpy.types.Operator):
             if self.join_select:
                 verts = np.arange(0, dtype=float)
                 verts.shape = (0, 3)
-                ob = context.object
+                ob = context.object if context.object else sel_obs[0]
                 mat_wrld_inv = np.array(ob.matrix_world.inverted())
 
-                for o in context.selected_objects:
+                for o in sel_obs:
                     if o.type == 'MESH':
                         all_type_err = False
                     else:
@@ -139,11 +142,11 @@ class ReplaceByPrimitive(bpy.types.Operator):
                         mat = mat_wrld_inv @ np.array(o.matrix_world)
                         verts_o = sb.transf_verts(mat, verts_o)
 
-                    np.concatenate((verts, verts_o))
+                    verts = np.concatenate((verts, verts_o))
 
-                self.core(context, ob, verts)
+                self.core(context, ob, verts, sel_obs)
             else:
-                for o in context.selected_objects:
+                for o in sel_obs:
                     if o.type == 'MESH':
                         all_type_err = False
                     else:
@@ -161,7 +164,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     verts = sb.get_verts(o) if self.align_to_axes \
                         and rot.dot(rot) > 0.001 else np.array(o.bound_box)
 
-                    self.core(context, o, verts)
+                    self.core(context, o, verts, [o])
 
             if all_type_err:
                 self.report({'ERROR_INVALID_INPUT'},
@@ -171,7 +174,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
         return {'FINISHED'}
 
 
-    def core(self, context, ob, verts):
+    def core(self, context, ob, verts, to_del=[]):
             if len(verts) < 2:
                 self.report({'ERROR_INVALID_INPUT'},
                             "Select at least 2 vertices")
@@ -196,21 +199,33 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 center = sb.transf_point(mat_wrld, center)
                 rotation = ob.matrix_world.to_euler()
 
-            # TODO delete all in obj mode
             if self.delete_original:
                 if ob.data.is_editmode:
                     sel_mode = context.tool_settings.mesh_select_mode
 
                     if sel_mode[0]:
-                        del_type = 'VERT'
+                        del_type = 'VERTS'
                     elif sel_mode[1]:
-                        del_type = 'EDGE'
+                        del_type = 'EDGES'
                     else:
-                        del_type = 'FACE'
+                        del_type = 'FACES'
 
-                    bpy.ops.mesh.delete(type=del_type)
+                    # a = time.time()
+                    v_sel = sb.get_vert_sel_flags(ob)
+                    bob = bm.from_edit_mesh(ob.data)
+                    v_to_del = np.array(bob.verts)[v_sel]
+
+                    # bm.ops.delete(bob, geom=v_to_del, context=del_type)
+                    for v in v_to_del:
+                        bob.verts.remove(v)
+
+                    bob.verts.ensure_lookup_table()
+                    bm.update_edit_mesh(ob.data)
+                    # b = time.time()
+                    # print(b - a)
                 else:
-                    bpy.data.objects.remove(ob)
+                    for o in to_del:
+                        bpy.data.objects.remove(o)
 
             if self.replace_by == 'CYLINDER_Z':
                 bpy.ops.mesh.primitive_cylinder_add(
@@ -240,7 +255,17 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     rotation=rotation)
             elif self.replace_by == 'CUBOID':
                 if context.mode == 'EDIT_MESH':
-                    sb.add_box_to_obj(ob, center, rotation, bounds)
+                    # imitate weird selection behavior of
+                    # bpy.ops.mesh.primitive_..._add()
+                    is_active = context.object is ob
+                    do_sel = not is_active or self.join_select
+                    sb.add_box_to_obj(
+                        ob=ob,
+                        location=center,
+                        rotation=rotation,
+                        size=bounds,
+                        select=do_sel,
+                        deselect=is_active)
                 else:
                     sb.add_box_to_scene(context, center, rotation, bounds)
             elif self.replace_by == 'SPHERE':
