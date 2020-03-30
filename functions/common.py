@@ -248,8 +248,18 @@ def get_bounds_and_center(verts):
     center = (co_max + co_min) * 0.5
     return bounds, center
 
-def get_unit_box():
+def get_unit_cube():
     """
+    Returns vertex coordinates and face indices for a unit cube.
+
+    Returns
+    -------
+    verts : numpy.ndarray
+        3x8 float array of XYZ vertex coordinates.
+    quads : numpy.ndarray
+        4x6 array of vertex indices for each quad face. Each 4-value tuple
+        holds the indices of the vertices in the verts array the
+        correspondig quad is connected to.
     """
 
     verts = np.array([
@@ -263,7 +273,7 @@ def get_unit_box():
         (-0.5, +0.5, +0.5),
     ])
 
-    faces = np.array([
+    quads = np.array([
         (0, 1, 2, 3),
         (4, 7, 6, 5),
         (0, 4, 5, 1),
@@ -272,29 +282,65 @@ def get_unit_box():
         (4, 0, 3, 7),
     ])
 
-    return verts, faces
-
-def deselect_bmesh(bob):
-    for v in bob.verts:
-        v.select = False
-    bob.select_flush_mode()
+    return verts, quads
 
 def add_geom_to_bmesh(bob, verts, faces, select=True):
-    v_offset = len(bob.verts)
-    for v in verts:
-        vert = bob.verts.new(v)
-        if select:
-            vert.select = True
+    """
+    Add geometry to a bmesh object.
+
+    Parameters
+    ----------
+    bob : bmesh.BMesh
+    The object to add the geometry to
+    verts : numpy.ndarray
+        3xN array of XYZ coordinates for N vertices to add.
+    quads : numpy.ndarray
+        Array of vertex indices for each face. Each entry holds the
+        indices of the vertices in the verts array the correspondig face
+        gets connected to.
+    select : Bool = True
+        Should the newly added vertices be selected? If yes, any other
+        vertex gets deselected
+    """
+    bverts = bob.verts
+    bfaces = bob.faces
+
+    # Vertex indices need to be offset by the number of verts already
+    # present in the mesh before anything is done.
+    v_offset = len(bverts)
 
     if select:
+        for v in verts:
+            # Add new vert and select it
+            bverts.new(v).select = True
         bob.select_flush_mode()
+    else:
+        for v in verts:
+            bverts.new(v)
 
-    bob.verts.ensure_lookup_table()
+    bverts.ensure_lookup_table()
     for f in faces:
-        bob.faces.new([bob.verts[v_offset + v_idx] for v_idx in f])
+        # Push list of BVert objects to bfaces that make up face f
+        bfaces.new([bverts[v_offset + v_idx] for v_idx in f])
 
 def add_box_to_scene(context, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(3), name='Box'):
-    verts, faces = get_unit_box()
+    """
+    Add a box mesh to a given context.
+
+    Parameters
+    ----------
+    context : bpy.context
+        Blender context to add the box to
+    location : numpy.ndarray = (0, 0, 0)
+        World location of the box
+    rotation : numpy.ndarray = (0, 0, 0)
+        World rotation of the box in Euler angles
+    size : numpy.ndarray = (1, 1, 1)
+        Length, height, and depth of the box, respectively
+    name : String
+        Name of the box
+    """
+    verts, faces = get_unit_cube()
     verts = transf_verts(make_transf_mat(location, rotation, size), verts)
 
     bob = bm.new()
@@ -304,26 +350,41 @@ def add_box_to_scene(context, location=np.zeros(3), rotation=np.zeros(3), size=n
     bob.to_mesh(mesh)
     mesh.update()
 
-    # add the mesh as an object into the scene with this utility module
+    # Add the mesh as an object into the scene
     from bpy_extras import object_utils
     object_utils.object_data_add(context, mesh)
 
 def add_box_to_obj(ob, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(3), select=True):
+    """
+    Add a box mesh to a given Blender object.
+
+    Parameters
+    ----------
+    ob : bpy.object
+        Blender object to add the box to
+    location : numpy.ndarray = (0, 0, 0)
+        World location of the box
+    rotation : numpy.ndarray = (0, 0, 0)
+        World rotation of the box in Euler angles
+    size : numpy.ndarray = (1, 1, 1)
+        Length, height, and depth of the box, respectively
+    select : Bool = True
+        Should the newly added vertices be selected? If yes, any other
+        vertex gets deselected
+    """
     bob = bm.from_edit_mesh(ob.data)
-    # if box should be selected, deselect everything else
+
+    # If box should be selected, deselect everything else
     if select:
-        deselect_bmesh(bob)
+        for v in bob.verts:
+            v.select = False
 
-    # TODO test if set_verts selection is faster
+    verts, faces = get_unit_cube()
 
-    verts, faces = get_unit_box()
-    # verts = transf_verts(make_transf_mat(location, rotation, size), verts)
+    # First apply given box transform, then transform it from world to local space
     mat = np.array(ob.matrix_world.inverted()) @ make_transf_mat(location, rotation, size)
-    print(mat)
     verts = transf_verts(mat, verts)
 
     add_geom_to_bmesh(bob, verts, faces, select)
     bm.update_edit_mesh(ob.data)
 
-def clamp(val, minv, maxv):
-    return max(min(val, maxv), minv)

@@ -1,3 +1,4 @@
+import pdb
 import bpy
 import bmesh as bm
 import smorgasbord.functions.common as sb
@@ -51,7 +52,12 @@ class ReplaceByPrimitive(bpy.types.Operator):
 
     align_to_axes: bpy.props.BoolProperty(
         name = "Align to Axes",
-        description = "Align the primitive to the world axes instead of the selected objects' rotation",
+        description = "Align the primitive to the world axes instead of the active objects' rotation",
+    )
+
+    join_select: bpy.props.BoolProperty(
+        name = "Join Multi-Selection",
+        description = "When (vertices of) several objects are selected, join selection into one primitive.",
     )
 
     delete_original: bpy.props.BoolProperty(
@@ -83,39 +89,79 @@ class ReplaceByPrimitive(bpy.types.Operator):
             self.metric = st.mean
 
         if context.mode == 'EDIT_MESH':
-            verts = np.arange(0, dtype=float)
-            verts.shape = (0, 3)
+            if self.join_select:
+                verts = np.arange(0, dtype=float)
+                verts.shape = (0, 3)
+                ob = context.object
+                mat_wrld_inv = np.array(ob.matrix_world.inverted())
 
-            for o in context.selected_objects:
-                # ensure newest changes from edit mode are visible to data
-                o.update_from_editmode()
+                # concatenate verts from all selected objects
+                for o in context.selected_objects:
+                    # ensure newest changes from edit mode are visible to data
+                    o.update_from_editmode()
 
-                sel_flags = sb.get_vert_sel_flags(o)
-                verts = np.concatenate((verts, sb.get_verts(o)[sel_flags]))
+                    sel_flags = sb.get_vert_sel_flags(o)
+                    verts_o = sb.get_verts(o)[sel_flags]
 
-            self.core(context, context.object, verts)
+                    # transform every vertex into coord system of active object
+                    if o is not ob:
+                        mat = mat_wrld_inv @ np.array(o.matrix_world)
+                        verts_o = sb.transf_verts(mat, verts_o)
+
+                    verts = np.concatenate((verts, verts_o))
+
+                self.core(context, ob, verts)
+            else:
+                for o in context.selected_objects:
+                    o.update_from_editmode()
+
+                    sel_flags = sb.get_vert_sel_flags(o)
+                    verts = sb.get_verts(o)[sel_flags]
+                    self.core(context, o, verts)
         else:
             all_type_err = True # no obj is of type mesh
 
-            for o in context.selected_objects:
-                if o.type == 'MESH':
-                    all_type_err = False
-                else:
-                    continue
+            if self.join_select:
+                verts = np.arange(0, dtype=float)
+                verts.shape = (0, 3)
+                ob = context.object
+                mat_wrld_inv = np.array(ob.matrix_world.inverted())
 
-                rot = np.array(o.matrix_world.to_euler())
+                for o in context.selected_objects:
+                    if o.type == 'MESH':
+                        all_type_err = False
+                    else:
+                        continue
 
-                # If we align to axes and the ob is rotated, we can't use
-                # Blender's bounding box. Instead, we have to find the global
-                # bounds from all global vertex positions.
-                # This is because for a rotated object, the global bounds of its
-                # local bounding box aren't always equal to the global bounds of
-                # all its vertices.
-                # If we don't align to axes, we aren't interested in the global
-                # ob bounds anyway.
-                verts = sb.get_verts(o) if self.align_to_axes \
-                    and rot.dot(rot) > 0.001 else np.array(o.bound_box)
-                self.core(context, o, verts)
+                    verts_o = sb.get_verts(o)
+
+                    if o is not ob:
+                        mat = mat_wrld_inv @ np.array(o.matrix_world)
+                        verts_o = sb.transf_verts(mat, verts_o)
+
+                    np.concatenate((verts, verts_o))
+
+                self.core(context, ob, verts)
+            else:
+                for o in context.selected_objects:
+                    if o.type == 'MESH':
+                        all_type_err = False
+                    else:
+                        continue
+
+                    # If we align to axes and the ob is rotated, we can't use
+                    # Blender's bounding box. Instead, we have to find the global
+                    # bounds from all global vertex positions.
+                    # This is because for a rotated object, the global bounds of its
+                    # local bounding box aren't always equal to the global bounds of
+                    # all its vertices.
+                    # If we don't align to axes, we aren't interested in the global
+                    # ob bounds anyway.
+                    rot = np.array(o.matrix_world.to_euler())
+                    verts = sb.get_verts(o) if self.align_to_axes \
+                        and rot.dot(rot) > 0.001 else np.array(o.bound_box)
+
+                    self.core(context, o, verts)
 
             if all_type_err:
                 self.report({'ERROR_INVALID_INPUT'},
@@ -150,6 +196,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 center = sb.transf_point(mat_wrld, center)
                 rotation = ob.matrix_world.to_euler()
 
+            # TODO delete all in obj mode
             if self.delete_original:
                 if ob.data.is_editmode:
                     sel_mode = context.tool_settings.mesh_select_mode
@@ -193,10 +240,6 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     rotation=rotation)
             elif self.replace_by == 'CUBOID':
                 if context.mode == 'EDIT_MESH':
-                    # center_local = sb.transf_point(
-                        # np.array(ob.matrix_world.inverted()), center)
-                    # rot_local = sb.transf_point(
-                        # np.array(ob.matrix_world.inverted()), rotation)
                     sb.add_box_to_obj(ob, center, rotation, bounds)
                 else:
                     sb.add_box_to_scene(context, center, rotation, bounds)
@@ -218,8 +261,8 @@ def register():
     for m in ReplaceByPrimitive.menus:
         m.append(draw_menu)
 
-
 def unregister():
+
     bpy.utils.unregister_class(ReplaceByPrimitive)
     for m in ReplaceByPrimitive.menus:
         m.remove(draw_menu)
