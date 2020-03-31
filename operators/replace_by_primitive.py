@@ -81,100 +81,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
             return cls.bl_description
 
 
-    def execute(self, context):
-        if self.fit_metric == 'MIN':
-            self.metric = min
-        elif self.fit_metric == 'MAX':
-            self.metric = max
-        else:
-            self.metric = st.mean
-
-        sel_obs = context.selected_objects
-
-        if context.mode == 'EDIT_MESH':
-            if self.join_select:
-                verts = np.arange(0, dtype=float)
-                verts.shape = (0, 3)
-                ob = context.object if context.object else sel_obs[0]
-                mat_wrld_inv = np.array(ob.matrix_world.inverted())
-
-                # concatenate verts from all selected objects
-                for o in sel_obs:
-                    # ensure newest changes from edit mode are visible to data
-                    o.update_from_editmode()
-
-                    sel_flags = sb.get_vert_sel_flags(o)
-                    verts_o = sb.get_verts(o)[sel_flags]
-
-                    # transform every vertex into coord system of active object
-                    if o is not ob:
-                        mat = mat_wrld_inv @ np.array(o.matrix_world)
-                        verts_o = sb.transf_verts(mat, verts_o)
-
-                    verts = np.concatenate((verts, verts_o))
-
-                self.core(context, ob, verts)
-            else:
-                for o in sel_obs:
-                    o.update_from_editmode()
-
-                    sel_flags = sb.get_vert_sel_flags(o)
-                    verts = sb.get_verts(o)[sel_flags]
-                    self.core(context, o, verts)
-        else:
-            all_type_err = True # no obj is of type mesh
-
-            if self.join_select:
-                verts = np.arange(0, dtype=float)
-                verts.shape = (0, 3)
-                ob = context.object if context.object else sel_obs[0]
-                mat_wrld_inv = np.array(ob.matrix_world.inverted())
-
-                for o in sel_obs:
-                    if o.type == 'MESH':
-                        all_type_err = False
-                    else:
-                        continue
-
-                    verts_o = sb.get_verts(o)
-
-                    if o is not ob:
-                        mat = mat_wrld_inv @ np.array(o.matrix_world)
-                        verts_o = sb.transf_verts(mat, verts_o)
-
-                    verts = np.concatenate((verts, verts_o))
-
-                self.core(context, ob, verts, sel_obs)
-            else:
-                for o in sel_obs:
-                    if o.type == 'MESH':
-                        all_type_err = False
-                    else:
-                        continue
-
-                    # If we align to axes and the ob is rotated, we can't use
-                    # Blender's bounding box. Instead, we have to find the global
-                    # bounds from all global vertex positions.
-                    # This is because for a rotated object, the global bounds of its
-                    # local bounding box aren't always equal to the global bounds of
-                    # all its vertices.
-                    # If we don't align to axes, we aren't interested in the global
-                    # ob bounds anyway.
-                    rot = np.array(o.matrix_world.to_euler())
-                    verts = sb.get_verts(o) if self.align_to_axes \
-                        and rot.dot(rot) > 0.001 else np.array(o.bound_box)
-
-                    self.core(context, o, verts, [o])
-
-            if all_type_err:
-                self.report({'ERROR_INVALID_INPUT'},
-                            "An object must be of type mesh")
-                return {'CANCELLED'}
-
-        return {'FINISHED'}
-
-
-    def core(self, context, ob, verts, to_del=[]):
+    def _core(self, context, ob, verts, to_del=[]):
             if len(verts) < 2:
                 self.report({'ERROR_INVALID_INPUT'},
                             "Select at least 2 vertices")
@@ -200,29 +107,18 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 rotation = ob.matrix_world.to_euler()
 
             if self.delete_original:
-                if ob.data.is_editmode:
-                    sel_mode = context.tool_settings.mesh_select_mode
+                if context.mode == 'EDIT_MESH':
+                    mode = context.tool_settings.mesh_select_mode
 
-                    if sel_mode[0]:
+                    if mode[0]:
                         del_type = 'VERTS'
-                    elif sel_mode[1]:
+                    elif mode[1]:
                         del_type = 'EDGES'
                     else:
                         del_type = 'FACES'
 
-                    # a = time.time()
-                    v_sel = sb.get_vert_sel_flags(ob)
-                    bob = bm.from_edit_mesh(ob.data)
-                    v_to_del = np.array(bob.verts)[v_sel]
-
-                    # bm.ops.delete(bob, geom=v_to_del, context=del_type)
-                    for v in v_to_del:
-                        bob.verts.remove(v)
-
-                    bob.verts.ensure_lookup_table()
-                    bm.update_edit_mesh(ob.data)
-                    # b = time.time()
-                    # print(b - a)
+                    for o in to_del:
+                        sb.remove_sel_verts(o.data, type=del_type)
                 else:
                     for o in to_del:
                         bpy.data.objects.remove(o)
@@ -263,9 +159,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
                         ob=ob,
                         location=center,
                         rotation=rotation,
-                        size=bounds,
-                        select=do_sel,
-                        deselect=is_active)
+                        size=bounds)
                 else:
                     sb.add_box_to_scene(context, center, rotation, bounds)
             elif self.replace_by == 'SPHERE':
@@ -275,6 +169,106 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     radius=self.metric(bounds) * 0.5,
                     location=center,
                     rotation=rotation)
+
+
+    def _exec_obj_mode(self, context):
+        all_type_err = True # no obj is of type mesh
+
+        if self.join_select:
+            verts = np.arange(0, dtype=float)
+            verts.shape = (0, 3)
+            ob = context.object if context.object else \
+                context.selected_objects[0]
+            mat_wrld_inv = np.array(ob.matrix_world.inverted())
+
+            for o in context.selected_objects:
+                if o.type == 'MESH':
+                    all_type_err = False
+                else:
+                    continue
+
+                verts_o = sb.get_verts(o)
+
+                if o is not ob:
+                    mat = mat_wrld_inv @ np.array(o.matrix_world)
+                    verts_o = sb.transf_verts(mat, verts_o)
+
+                verts = np.concatenate((verts, verts_o))
+
+            self._core(context, ob, verts, context.selected_objects)
+        else:
+            for o in context.selected_objects:
+                if o.type == 'MESH':
+                    all_type_err = False
+                else:
+                    continue
+
+                # If we align to axes and the ob is rotated, we can't use
+                # Blender's bounding box. Instead, we have to find the global
+                # bounds from all global vertex positions.
+                # This is because for a rotated object, the global bounds of its
+                # local bounding box aren't always equal to the global bounds of
+                # all its vertices.
+                # If we don't align to axes, we aren't interested in the global
+                # ob bounds anyway.
+                rot = np.array(o.matrix_world.to_euler())
+                verts = sb.get_verts(o) if self.align_to_axes \
+                    and rot.dot(rot) > 0.001 else np.array(o.bound_box)
+
+                self._core(context, o, verts, [o])
+
+        if all_type_err:
+            self.report({'ERROR_INVALID_INPUT'},
+                        "An object must be of type mesh")
+            return {'CANCELLED'}
+
+
+    def _exec_edit_mode(self, context):
+        if self.join_select:
+            verts = np.arange(0, dtype=float)
+            verts.shape = (0, 3)
+            ob = context.object if context.object else context.selected_objects[0]
+            mat_wrld_inv = np.array(ob.matrix_world.inverted())
+
+            # concatenate verts from all selected objects
+            for o in context.selected_objects:
+                # ensure newest changes from edit mode are visible to data
+                o.update_from_editmode()
+
+                sel_flags = sb.get_vert_sel_flags(o)
+                verts_o = sb.get_verts(o)[sel_flags]
+
+                # transform every vertex into coord system of active object
+                if o is not ob:
+                    mat = mat_wrld_inv @ np.array(o.matrix_world)
+                    verts_o = sb.transf_verts(mat, verts_o)
+
+                verts = np.concatenate((verts, verts_o))
+
+            self._core(context, ob, verts, context.selected_objects)
+        else:
+            for o in context.selected_objects:
+                o.update_from_editmode()
+
+                sel_flags = sb.get_vert_sel_flags(o)
+                verts = sb.get_verts(o)[sel_flags]
+                self._core(context, o, verts, [o])
+
+
+    def execute(self, context):
+        if self.fit_metric == 'MIN':
+            self.metric = min
+        elif self.fit_metric == 'MAX':
+            self.metric = max
+        else:
+            self.metric = st.mean
+
+        if context.mode == 'EDIT_MESH':
+            self._exec_edit_mode(context)
+        else:
+            self._exec_obj_mode(context)
+
+        return {'FINISHED'}
 
 
 def draw_menu(self, context):

@@ -38,6 +38,11 @@ def set_verts(ob, verts):
     ob.data.vertices.foreach_set("co", verts.ravel())
     ob.data.update()
 
+def get_sel_flags(geom):
+    flags = np.zeros(len(geom), dtype=np.bool)
+    geom.foreach_get('select', flags)
+    return flags
+
 def get_vert_sel_flags(ob):
     """
     get_vert_sel_flags(ob)
@@ -54,10 +59,7 @@ def get_vert_sel_flags(ob):
     sel : numpy.ndarray
         Bool array with an entry set to True for every vertex in ob selected.
     """
-    verts = ob.data.vertices
-    sel = np.zeros(len(verts), dtype=np.bool)
-    verts.foreach_get('select', sel)
-    return sel
+    return get_sel_flags(ob.data.vertices)
 
 def homogenize(verts):
     """
@@ -304,26 +306,24 @@ def add_geom_to_bmesh(bob, verts, faces, select=True):
     """
     bverts = bob.verts
     bfaces = bob.faces
+    bverts_new = []
 
     # Vertex indices need to be offset by the number of verts already
     # present in the mesh before anything is done.
-    v_offset = len(bverts)
-
-    if select:
-        for v in verts:
-            # Add new vert and select it
-            bverts.new(v).select = True
-    else:
-        for v in verts:
-            bverts.new(v)
+    for i, v in enumerate(verts, start=len(bverts)):
+        # Add new vert and select it
+        bv = bverts.new(v)
+        bv.index = i
+        bv.select = select
+        bverts_new.append(bv)
 
     bverts.ensure_lookup_table()
     for f in faces:
         # Push list of BVert objects to bfaces that make up face f
-        bfaces.new([bverts[v_offset + v_idx] for v_idx in f])
+        bfaces.new([bverts_new[v_idx] for v_idx in f])
 
     if select:
-        bob.select_flush_mode()
+        bob.select_flush(True)
 
 def add_box_to_scene(context, location=np.zeros(3), rotation=np.zeros(3), size=np.ones(3), name='Box'):
     """
@@ -361,7 +361,7 @@ def add_box_to_obj(
         location=np.zeros(3),
         rotation=np.zeros(3),
         size=np.ones(3),
-        select=False,
+        select=True,
         deselect=True):
     """
     Add a box mesh to a given Blender object.
@@ -376,9 +376,10 @@ def add_box_to_obj(
         World rotation of the box in Euler angles
     size : numpy.ndarray = (1, 1, 1)
         Length, height, and depth of the box, respectively
-    select : Bool = True
-        Should the newly added vertices be selected? If yes, any other
-        vertex gets deselected
+    select_new : Bool = True
+        Should the newly added vertices be selected?
+    deselect : Bool = True
+        Should already existing vertices be deselected?
     """
     bob = bm.from_edit_mesh(ob.data)
 
@@ -386,7 +387,7 @@ def add_box_to_obj(
     if deselect:
         for v in bob.verts:
             v.select = False
-        bob.select_flush_mode()
+        bob.select_flush(False)
 
     verts, faces = get_unit_cube()
 
@@ -397,3 +398,22 @@ def add_box_to_obj(
     add_geom_to_bmesh(bob, verts, faces, select)
     bm.update_edit_mesh(ob.data)
 
+def remove_sel_verts(data, type='VERTS'):
+    bob = bm.from_edit_mesh(data)
+
+    if type == 'EDGES':
+        geom = data.edges
+        bgeom = bob.edges
+    elif type =='FACES':
+        geom = data.polygons
+        bgeom = bob.faces
+    else:
+        geom = data.vertices
+        bgeom = bob.verts
+
+    flags = get_sel_flags(geom)
+    for i in np.array(bgeom)[flags]:
+        bgeom.remove(i)
+
+    bgeom.ensure_lookup_table()
+    bm.update_edit_mesh(data)
