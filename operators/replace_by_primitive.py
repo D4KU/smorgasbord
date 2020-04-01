@@ -123,6 +123,9 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     for o in to_del:
                         bpy.data.objects.remove(o)
 
+            # so primitive_..._add() adds the primitive to ob
+            context.view_layer.objects.active = ob
+
             if self.replace_by == 'CYLINDER_Z':
                 bpy.ops.mesh.primitive_cylinder_add(
                     vertices=self.resolution,
@@ -264,7 +267,10 @@ class ReplaceByPrimitive(bpy.types.Operator):
             self.metric = st.mean
 
         if context.mode == 'EDIT_MESH':
+            ob = context.object
             self._exec_edit_mode(context)
+            # restore original active object
+            context.view_layer.objects.active = ob
         else:
             self._exec_obj_mode(context)
 

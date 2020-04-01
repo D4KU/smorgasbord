@@ -412,8 +412,8 @@ def remove_sel_verts(data, type='VERTS'):
         bgeom = bob.verts
 
     flags = get_sel_flags(geom)
-    for i in np.array(bgeom)[flags]:
-        bgeom.remove(i)
+    to_del = np.array(bgeom)[flags]
+    bm.ops.delete(bob, geom=to_del, context=type)
 
-    bgeom.ensure_lookup_table()
+    # bgeom.ensure_lookup_table()
     bm.update_edit_mesh(data)
