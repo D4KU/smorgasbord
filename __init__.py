@@ -1,6 +1,13 @@
 import sys
 
-from smorgasbord.operators import (
+from smorgasbord.common import (
+    io,
+    mat_manip,
+    mesh_manip,
+    transf,
+)
+
+from smorgasbord.ops import (
     align_bounds,
     apply_name,
     prepare_export_to_unity,
@@ -9,7 +16,7 @@ from smorgasbord.operators import (
     select_by_name,
     select_loose_by_size,
     set_parent_advanced,
-    )
+)
 
 
 bl_info = {

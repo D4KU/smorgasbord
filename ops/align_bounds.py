@@ -55,8 +55,7 @@ class AlignBounds(bpy.types.Operator):
 
             # get selected vertices in target
             sel_flags_target = sb.get_vert_sel_flags(target)
-            verts_target = sb.get_verts(target)
-            verts_target = verts_target[sel_flags_target]
+            verts_target = sb.get_verts(target)[sel_flags_target]
         else:
             rot_target = np.array(euler_target)
 
