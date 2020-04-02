@@ -1,8 +1,18 @@
 import bmesh as bm
-import smorgasbord.functions.common as sb
 import bpy
 import mathutils as mu
 import numpy as np
+
+import smorgasbord.common.io as sbio
+
+
+def _get_vol_limits(self):
+    return SelectLooseBySize._vol_limits
+
+
+def _set_vol_limits(self, value):
+    # clamp min to max
+    SelectLooseBySize._vol_limits = (min(value), value[1])
 
 
 class SelectLooseBySize(bpy.types.Operator):
@@ -17,13 +27,6 @@ class SelectLooseBySize(bpy.types.Operator):
     # to prevent infinite recursion in getter and setter
     _vol_limits = mu.Vector((0.0, 1.0))
 
-    def _get_vol_limits(self):
-        return SelectLooseBySize._vol_limits
-
-    def _set_vol_limits(self, value):
-        # clamp min to max
-        SelectLooseBySize._vol_limits = (min(value), value[1])
-
     vol_limits: bpy.props.FloatVectorProperty(
         name = "Bounding Volume Limits",
         description = "Loose parts whose bounding box's volume lies between (min, max] get selected",
@@ -36,9 +39,11 @@ class SelectLooseBySize(bpy.types.Operator):
         set = _set_vol_limits,
     )
 
+
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and len(context.selected_objects) > 0
+
 
     def execute(self, context):
         all_type_err = True # no obj is of type mesh
@@ -87,13 +92,13 @@ class SelectLooseBySize(bpy.types.Operator):
 
                 parts.append((indcs, coords))
 
-            # repurpose bool array, this time storing whether
+            # reuse bool array, this time storing whether
             # the vert at that index needs to get selected
             checked_indcs.fill(False)
 
             # 2. select small enough loose parts
             for indcs, coords in parts:
-                bounds, _ = sb.get_bounds_and_center(coords)
+                bounds, _ = sbio.get_bounds_and_center(coords)
                 vol = np.prod(bounds)
 
                 # only select loose parts with right volume
@@ -111,19 +116,24 @@ class SelectLooseBySize(bpy.types.Operator):
             return {'CANCELLED'}
         return {'FINISHED'}
 
+
 def draw_menu(self, context):
     self.layout.operator(SelectLooseBySize.bl_idname)
+
 
 def register():
     bpy.utils.register_class(SelectLooseBySize)
     for m in SelectLooseBySize.menus:
         m.append(draw_menu)
 
+
 def unregister():
     bpy.utils.unregister_class(SelectLooseBySize)
     for m in SelectLooseBySize.menus:
         m.remove(draw_menu)
 
+
 # for convenience when script is run inside Blender's text editor
 if __name__ == "__main__":
     register()
+

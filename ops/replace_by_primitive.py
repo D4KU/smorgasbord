@@ -1,11 +1,12 @@
-import time
-import pdb
 import bpy
 import bmesh as bm
-import smorgasbord.functions.common as sb
 import mathutils as mu
 import numpy as np
 import statistics as st
+
+import smorgasbord.common.io as sbio
+import smorgasbord.common.mesh_manip as sbmm
+import smorgasbord.common.transf as sbt
 
 
 class ReplaceByPrimitive(bpy.types.Operator):
@@ -92,18 +93,18 @@ class ReplaceByPrimitive(bpy.types.Operator):
             if self.align_to_axes:
                 # If we align sources to world axes, we are interested in the
                 # bounds in world coordinates.
-                verts = sb.transf_verts(mat_wrld, verts)
+                verts = sbt.transf_verts(mat_wrld, verts)
                 # If we align sources to axes, we ignore ob's rotation.
                 rotation = mu.Euler()
 
-            bounds, center = sb.get_bounds_and_center(verts)
+            bounds, center = sbio.get_bounds_and_center(verts)
 
             if not self.align_to_axes:
                 # Even though we want the ob bounds in object space if align
                 # to axes is false, we still are interested in world scale and
                 # center.
                 bounds *= np.array(ob.matrix_world.to_scale())
-                center = sb.transf_point(mat_wrld, center)
+                center = sbt.transf_point(mat_wrld, center)
                 rotation = ob.matrix_world.to_euler()
 
             if self.delete_original:
@@ -118,7 +119,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
                         del_type = 'FACES'
 
                     for o in to_del:
-                        sb.remove_sel_verts(o.data, type=del_type)
+                        sbmm.remove_selection(o.data, type=del_type)
                 else:
                     for o in to_del:
                         bpy.data.objects.remove(o)
@@ -158,13 +159,13 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     # bpy.ops.mesh.primitive_..._add()
                     is_active = context.object is ob
                     do_sel = not is_active or self.join_select
-                    sb.add_box_to_obj(
+                    sbmm.add_box_to_obj(
                         ob=ob,
                         location=center,
                         rotation=rotation,
                         size=bounds)
                 else:
-                    sb.add_box_to_scene(context, center, rotation, bounds)
+                    sbmm.add_box_to_scene(context, center, rotation, bounds)
             elif self.replace_by == 'SPHERE':
                 bpy.ops.mesh.primitive_uv_sphere_add(
                     segments=self.resolution * 2,
@@ -190,11 +191,11 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 else:
                     continue
 
-                verts_o = sb.get_verts(o)
+                verts_o = sbio.get_verts(o.data)
 
                 if o is not ob:
                     mat = mat_wrld_inv @ np.array(o.matrix_world)
-                    verts_o = sb.transf_verts(mat, verts_o)
+                    verts_o = sbt.transf_verts(mat, verts_o)
 
                 verts = np.concatenate((verts, verts_o))
 
@@ -215,7 +216,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 # If we don't align to axes, we aren't interested in the global
                 # ob bounds anyway.
                 rot = np.array(o.matrix_world.to_euler())
-                verts = sb.get_verts(o) if self.align_to_axes \
+                verts = sbio.get_verts(o.data) if self.align_to_axes \
                     and rot.dot(rot) > 0.001 else np.array(o.bound_box)
 
                 self._core(context, o, verts, [o])
@@ -238,13 +239,13 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 # ensure newest changes from edit mode are visible to data
                 o.update_from_editmode()
 
-                sel_flags = sb.get_vert_sel_flags(o)
-                verts_o = sb.get_verts(o)[sel_flags]
+                sel_flags = sbio.get_sel_flags(o.data.vertices)
+                verts_o = sbio.get_verts(o.data)[sel_flags]
 
                 # transform every vertex into coord system of active object
                 if o is not ob:
                     mat = mat_wrld_inv @ np.array(o.matrix_world)
-                    verts_o = sb.transf_verts(mat, verts_o)
+                    verts_o = sbt.transf_verts(mat, verts_o)
 
                 verts = np.concatenate((verts, verts_o))
 
@@ -253,8 +254,8 @@ class ReplaceByPrimitive(bpy.types.Operator):
             for o in context.selected_objects:
                 o.update_from_editmode()
 
-                sel_flags = sb.get_vert_sel_flags(o)
-                verts = sb.get_verts(o)[sel_flags]
+                sel_flags = sbio.get_sel_flags(o.data.vertices)
+                verts = sbio.get_verts(o.data)[sel_flags]
                 self._core(context, o, verts, [o])
 
 
