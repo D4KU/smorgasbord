@@ -39,26 +39,36 @@ class SelectLooseBySize(bpy.types.Operator):
         set = _set_vol_limits,
     )
 
+    # contains one list of loose parts per selected object
+    _obs = []
+
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and len(context.selected_objects) > 0
+        return context.mode == 'EDIT_MESH' and \
+            len(context.selected_editable_objects) > 0
 
 
-    def execute(self, context):
+    def invoke(self, context, event):
+        self._find_parts(context)
+        return self.execute(context)
+
+
+    def _find_parts(self, context):
+        self._obs.clear()
         all_type_err = True # no obj is of type mesh
 
-        for ob in context.selected_objects:
-            data = ob.data        # bpy representation of object data
+        for o in context.selected_editable_objects:
+            data = o.data         # bpy representation of object data
             verts = data.vertices # bpy representation of vertices
             vert_count = len(verts)
 
-            if ob.type == 'MESH':
+            if o.type == 'MESH':
                 all_type_err = False
             else:
                 continue
 
-            parts = []                      # loose parts of mesh
+            parts = [] # loose parts of mesh o
             bdata = bm.from_edit_mesh(data) # bmesh representation of object data
             bverts = bdata.verts            # bmesh representation of vertices
             bverts.ensure_lookup_table()
@@ -91,29 +101,42 @@ class SelectLooseBySize(bpy.types.Operator):
                             checked_indcs[v2.index] = True
 
                 parts.append((indcs, coords))
+            self._obs.append(parts)
 
-            # reuse bool array, this time storing whether
+        if all_type_err:
+            self.report({'ERROR_INVALID_INPUT'},
+                        "An object must be of type mesh")
+            return {'CANCELLED'}
+        return self.execute(context)
+
+
+    def execute(self, context):
+        # in case operator is called via console, where invoke() isn't executed
+        if not self._obs:
+            self._find_parts(context)
+
+        for o, parts in zip(context.selected_editable_objects, self._obs):
+            data = o.data         # bpy representation of object data
+            verts = data.vertices # bpy representation of vertices
+
+            # bool array of vertex indices storing whether
             # the vert at that index needs to get selected
-            checked_indcs.fill(False)
+            sel_flags = np.zeros(len(verts), dtype=bool)
 
-            # 2. select small enough loose parts
+            # select small enough loose parts
             for indcs, coords in parts:
                 bounds, _ = sbio.get_bounds_and_center(coords)
                 vol = np.prod(bounds)
 
                 # only select loose parts with right volume
                 if vol > self._vol_limits[0] and vol <= self._vol_limits[1]:
-                    checked_indcs[indcs] = True
+                    sel_flags[indcs] = True
 
             # somehow the mesh doesn't update if we stay in edit mode
             bpy.ops.object.mode_set(mode='OBJECT')
-            verts.foreach_set('select', checked_indcs)
+            verts.foreach_set('select', sel_flags)
             bpy.ops.object.mode_set(mode='EDIT')
 
-        if all_type_err:
-            self.report({'ERROR_INVALID_INPUT'},
-                        "An object must be of type mesh")
-            return {'CANCELLED'}
         return {'FINISHED'}
 
 
