@@ -1,6 +1,8 @@
 import bpy
+from smorgasbord.common.decorate import register
 
 
+@register
 class SelectAllByName(bpy.types.Operator):
     bl_idname = "object.select_all_by_name"
     bl_label = "Select All by Name"
@@ -25,6 +27,7 @@ class SelectAllByName(bpy.types.Operator):
         ]
     )
 
+
     def execute(self, context):
         if self.match_metric == 'CONTAINS':
             compare = lambda a, b: b in a
@@ -41,19 +44,6 @@ class SelectAllByName(bpy.types.Operator):
 
         return {'FINISHED'}
 
-def draw_menu(self, context):
-    self.layout.operator(SelectAllByName.bl_idname)
 
-def register():
-    bpy.utils.register_class(SelectAllByName)
-    for m in SelectAllByName.menus:
-        m.append(draw_menu)
-
-def unregister():
-    bpy.utils.unregister_class(SelectAllByName)
-    for m in SelectAllByName.menus:
-        m.remove(draw_menu)
-
-# for convenience when script is run inside Blender's text editor
 if __name__ == "__main__":
     register()

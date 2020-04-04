@@ -4,6 +4,7 @@ import mathutils as mu
 import numpy as np
 
 import smorgasbord.common.io as sbio
+import smorgasbord.common.decorate as sbd
 
 
 def _get_vol_limits(self):
@@ -15,6 +16,7 @@ def _set_vol_limits(self, value):
     SelectLooseBySize._vol_limits = (min(value), value[1])
 
 
+@sbd.register
 class SelectLooseBySize(bpy.types.Operator):
     bl_idname = "select.select_loose_by_size"
     bl_label = "Select Loose by Size"
@@ -76,7 +78,7 @@ class SelectLooseBySize(bpy.types.Operator):
             # bool array of vertex indices already put on stack 'to_visit'
             checked_indcs = np.zeros(vert_count, dtype=bool)
 
-            # 1. find loose parts in mesh
+            # find loose parts in mesh
             for idx, checked in enumerate(checked_indcs):
                 if checked:
                     continue
@@ -100,14 +102,17 @@ class SelectLooseBySize(bpy.types.Operator):
                             to_visit.append(v2)
                             checked_indcs[v2.index] = True
 
-                parts.append((indcs, coords))
+                bounds, _ = sbio.get_bounds_and_center(coords)
+
+                # append tuple of vertex index list and volume
+                parts.append((indcs, np.prod(bounds)))
+
             self._obs.append(parts)
 
         if all_type_err:
             self.report({'ERROR_INVALID_INPUT'},
                         "An object must be of type mesh")
             return {'CANCELLED'}
-        return self.execute(context)
 
 
     def execute(self, context):
@@ -124,12 +129,9 @@ class SelectLooseBySize(bpy.types.Operator):
             sel_flags = np.zeros(len(verts), dtype=bool)
 
             # select small enough loose parts
-            for indcs, coords in parts:
-                bounds, _ = sbio.get_bounds_and_center(coords)
-                vol = np.prod(bounds)
-
+            for indcs, vol in parts:
                 # only select loose parts with right volume
-                if vol > self._vol_limits[0] and vol <= self._vol_limits[1]:
+                if self._vol_limits[0] < vol <= self._vol_limits[1]:
                     sel_flags[indcs] = True
 
             # somehow the mesh doesn't update if we stay in edit mode
@@ -137,26 +139,16 @@ class SelectLooseBySize(bpy.types.Operator):
             verts.foreach_set('select', sel_flags)
             bpy.ops.object.mode_set(mode='EDIT')
 
+        # because only vertices are updated, ensure selection is also seen in
+        # edge and face mode
+        sel_mode = context.tool_settings.mesh_select_mode
+        if sel_mode[1] or sel_mode[2]:
+            bpy.ops.mesh.select_mode(use_extend=True, type='VERT')
+            bpy.ops.mesh.select_mode(use_extend=True, type='VERT')
+
         return {'FINISHED'}
 
 
-def draw_menu(self, context):
-    self.layout.operator(SelectLooseBySize.bl_idname)
-
-
-def register():
-    bpy.utils.register_class(SelectLooseBySize)
-    for m in SelectLooseBySize.menus:
-        m.append(draw_menu)
-
-
-def unregister():
-    bpy.utils.unregister_class(SelectLooseBySize)
-    for m in SelectLooseBySize.menus:
-        m.remove(draw_menu)
-
-
-# for convenience when script is run inside Blender's text editor
 if __name__ == "__main__":
     register()
 

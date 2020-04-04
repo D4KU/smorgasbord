@@ -1,7 +1,10 @@
 import bpy
 import mathutils as mu
 
+from smorgasbord.common.decorate import register
 
+
+@register
 class SetParentAdvanced(bpy.types.Operator):
     bl_idname = "object.set_parent_advanced"
     bl_label = "Set Parent Advanced"
@@ -25,6 +28,7 @@ class SetParentAdvanced(bpy.types.Operator):
              "Parent selected objects to the active one while keeping the child's world transform. It's world transform is now also its new local origin")
         ]
     )
+
 
     def execute(self, context):
         parent = context.object
@@ -53,19 +57,6 @@ class SetParentAdvanced(bpy.types.Operator):
         bpy.context.view_layer.update()
         return {'FINISHED'}
 
-def draw_menu(self, context):
-    self.layout.operator(SetParentAdvanced.bl_idname)
 
-def register():
-    bpy.utils.register_class(SetParentAdvanced)
-    for m in SetParentAdvanced.menus:
-        m.append(draw_menu)
-
-def unregister():
-    bpy.utils.unregister_class(SetParentAdvanced)
-    for m in SetParentAdvanced.menus:
-        m.remove(draw_menu)
-
-# for convenience when script is run inside Blender's text editor
 if __name__ == "__main__":
     register()

@@ -1,6 +1,8 @@
 import bpy
+from smorgasbord.common.decorate import register
 
 
+@register
 class PrepareExportToUnity(bpy.types.Operator):
     bl_idname = "transform.prepare_export_to_unity"
     bl_label = "Prepare Export to Unity"
@@ -22,6 +24,7 @@ class PrepareExportToUnity(bpy.types.Operator):
         default = True,
     )
 
+
     def execute(self, context):
         if self.prepare_rotation:
             bpy.ops.transform.rotate(value=1.5708, orient_axis='X')
@@ -35,19 +38,6 @@ class PrepareExportToUnity(bpy.types.Operator):
 
         return {'FINISHED'}
 
-def draw_menu(self, context):
-    self.layout.operator(PrepareExportToUnity.bl_idname)
 
-def register():
-    bpy.utils.register_class(PrepareExportToUnity)
-    for m in PrepareExportToUnity.menus:
-        m.append(draw_menu)
-
-def unregister():
-    bpy.utils.unregister_class(PrepareExportToUnity)
-    for m in PrepareExportToUnity.menus:
-        m.remove(draw_menu)
-
-# for convenience when script is run inside Blender's text editor
 if __name__ == "__main__":
     register()

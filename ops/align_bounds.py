@@ -5,8 +5,10 @@ import numpy as np
 import smorgasbord.common.io as sbio
 import smorgasbord.common.mat_manip as sbmm
 import smorgasbord.common.transf as sbt
+import smorgasbord.common.decorate as sbd
 
 
+@sbd.register
 class AlignBounds(bpy.types.Operator):
     bl_idname = "transform.align_bounds"
     bl_label = "Align Bounds"
@@ -162,23 +164,6 @@ class AlignBounds(bpy.types.Operator):
         return {'FINISHED'}
 
 
-def draw_menu(self, context):
-    self.layout.operator(AlignBounds.bl_idname)
-
-
-def register():
-    bpy.utils.register_class(AlignBounds)
-    for m in AlignBounds.menus:
-        m.append(draw_menu)
-
-
-def unregister():
-    bpy.utils.unregister_class(AlignBounds)
-    for m in AlignBounds.menus:
-        m.remove(draw_menu)
-
-
-# for convenience when script is run inside Blender's text editor
 if __name__ == "__main__":
     register()
 

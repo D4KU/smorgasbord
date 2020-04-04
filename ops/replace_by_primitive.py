@@ -7,8 +7,10 @@ import statistics as st
 import smorgasbord.common.io as sbio
 import smorgasbord.common.mesh_manip as sbmm
 import smorgasbord.common.transf as sbt
+import smorgasbord.common.decorate as sbd
 
 
+@sbd.register
 class ReplaceByPrimitive(bpy.types.Operator):
     bl_idname = "mesh.replace_by_primitive"
     bl_label = "Replace By Primitive"
@@ -276,22 +278,6 @@ class ReplaceByPrimitive(bpy.types.Operator):
             self._exec_obj_mode(context)
 
         return {'FINISHED'}
-
-
-def draw_menu(self, context):
-    self.layout.operator(ReplaceByPrimitive.bl_idname)
-
-
-def register():
-    bpy.utils.register_class(ReplaceByPrimitive)
-    for m in ReplaceByPrimitive.menus:
-        m.append(draw_menu)
-
-def unregister():
-
-    bpy.utils.unregister_class(ReplaceByPrimitive)
-    for m in ReplaceByPrimitive.menus:
-        m.remove(draw_menu)
 
 
 if __name__ == "__main__":

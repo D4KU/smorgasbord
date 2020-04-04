@@ -2,7 +2,10 @@ import bpy
 import mathutils as mu
 import re
 
+from smorgasbord.common.decorate import register
 
+
+@register
 class ReplaceDuplicateMaterials(bpy.types.Operator):
     bl_idname = "object.replace_duplicate_materials"
     bl_label = "Replace Duplicate Materials"
@@ -18,9 +21,11 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
         default = '.*(?=\.[0-9]+)'
     )
 
+
     @classmethod
     def poll(cls, context):
         return len(context.selected_objects) > 0
+
 
     def execute(self, context):
         pat = re.compile(self.pattern)
@@ -42,19 +47,6 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
 
         return {'FINISHED'}
 
-def draw_menu(self, context):
-    self.layout.operator(ReplaceDuplicateMaterials.bl_idname)
 
-def register():
-    bpy.utils.register_class(ReplaceDuplicateMaterials)
-    for m in ReplaceDuplicateMaterials.menus:
-        m.append(draw_menu)
-
-def unregister():
-    bpy.utils.unregister_class(ReplaceDuplicateMaterials)
-    for m in ReplaceDuplicateMaterials.menus:
-        m.remove(draw_menu)
-
-# for convenience when script is run inside Blender's text editor
 if __name__ == "__main__":
     register()
