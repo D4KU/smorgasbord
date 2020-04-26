@@ -184,7 +184,7 @@ def remove_selection(data, type='VERTS'):
     if type == 'EDGES':
         geom = data.edges
         bgeom = bob.edges
-    elif type =='FACES':
+    elif type == 'FACES':
         geom = data.polygons
         bgeom = bob.faces
     else:
@@ -196,4 +196,3 @@ def remove_selection(data, type='VERTS'):
     bm.ops.delete(bob, geom=to_del, context=type)
 
     bm.update_edit_mesh(data)
-

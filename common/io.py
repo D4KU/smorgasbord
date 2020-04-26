@@ -1,14 +1,16 @@
 import numpy as np
 
 
-def get_verts(data):
+def get_verts(data, attr="co"):
     """
     Return vertex coordinates of a Blender object as a numpy array.
 
     Parameters
     ----------
     data : bpy.object.data
-        Object data to get vertices from.
+        Object data to get vertex information from.
+    attr : string = "co"
+        vector3 vertex attribute to get. Defaults to coordinates.
 
     Returns
     -------
@@ -17,12 +19,12 @@ def get_verts(data):
     """
     count = len(data.vertices)
     verts = np.empty(count * 3, dtype=np.float64)
-    data.vertices.foreach_get('co', verts)
+    data.vertices.foreach_get(attr, verts)
     verts.shape = (count, 3)
     return verts
 
 
-def set_verts(data, verts):
+def set_verts(data, verts, attr="co"):
     """
     Set vertex coordinates of a Blender object from a numpy array.
 
@@ -32,8 +34,10 @@ def set_verts(data, verts):
         Object data whose vertices to set.
     verts : numpy.ndarray
         Array of vertex coordinates.
+    attr : string = "co"
+        Vertex attribute to get. Defaults to coordinates.
     """
-    data.vertices.foreach_set("co", verts.ravel())
+    data.vertices.foreach_set(attr, verts.ravel())
     data.update()
 
 
