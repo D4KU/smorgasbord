@@ -1,105 +1,90 @@
 import numpy as np
 
 
-def get_verts(data, attr="co"):
+def get_vecs(geom, attr='co', vecsize=3):
     """
-    Return vertex coordinates of a Blender object as a numpy array.
+    Return vector values of a Blender property collection
+    as a numpy array.
 
     Parameters
     ----------
-    data : bpy.object.data
-        Object data to get vertex information from.
-    attr : string = "co"
-        vector3 vertex attribute to get. Defaults to coordinates.
+    geom : bpy.types.bpy_prop_collection
+        Geometry to get vectors from (vertices, edges, ...)
+    attr : string = 'co'
+        Vector vertex attribute to get. Defaults to coordinates.
+    vecsize : int = 3
+        Size of vectors to get.
 
     Returns
     -------
-    verts : numpy.ndarray
-        Array of vertices.
+    vs : numpy.ndarray
+        Array of vectors.
     """
-    count = len(data.vertices)
-    verts = np.empty(count * 3, dtype=np.float64)
-    data.vertices.foreach_get(attr, verts)
-    verts.shape = (count, 3)
-    return verts
+    vs = np.empty(len(geom) * vecsize, dtype=np.float64)
+    geom.foreach_get(attr, vs)
+    vs.shape = (-1, vecsize)
+    return vs
 
 
-def set_verts(data, verts, attr="co"):
+def set_vals(geom, vals, attr='co'):
     """
-    Set vertex coordinates of a Blender object from a numpy array.
+    Set each element in a Blender property collection.
 
     Parameters
     ----------
-    data : bpy.object.data
-        Object data whose vertices to set.
-    verts : numpy.ndarray
-        Array of vertex coordinates.
-    attr : string = "co"
-        Vertex attribute to get. Defaults to coordinates.
+    geom : bpy.types.bpy_prop_collection
+        Geometry to change (vertices, edges, ...)
+    vals : Iterable
+        Values to write into the collection
+    attr : string = 'co'
+        Attribute to set. Defaults to coordinates.
     """
-    data.vertices.foreach_set(attr, verts.ravel())
-    data.update()
+    geom.foreach_set(attr, np.asarray(vals).ravel())
+    geom.data.update()
 
 
-def get_sel_flags(geom):
+def get_bools(geom, attr='select'):
     """
-    Get a numpy bool array indicating the selection state of every item in a
-    given Blender struct.
+    Return Boolean values of a Blender property collection
+    as a numpy array.
 
     Parameters
     ----------
-    geom : bpy.struct
-        Geometry to get the selection state from. E.g. vertices, edges, ...
+    geom : bpy.types.bpy_prop_collection
+        Geometry to get bools from (vertices, edges, ...)
+    attr : string = 'select'
+        Boolean attribute to get. Defaults to selection state.
 
     Returns
     -------
-    flags : numpy.ndarray
-        Bool array with an entry set to True for every item in geom selected.
+    bs : numpy.ndarray
+        Array of Booleans
     """
-    flags = np.zeros(len(geom), dtype=np.bool)
-    geom.foreach_get('select', flags)
-    return flags
+    bs = np.empty(len(geom), dtype=np.bool)
+    geom.foreach_get(attr, bs)
+    return bs
 
 
-def get_vert_sel_flags(data):
+def get_bounds_and_center(points):
     """
-    Get a numpy bool array indicating every vertex' selection state of a given
-    Blender object.
+    Calculate the bounds and center for a given set of points.
 
     Parameters
     ----------
-    data : bpy.object.data
-        Object data to get vertex selection from.
-
-    Returns
-    -------
-    flags : numpy.ndarray
-        Bool array with an entry set to True for every vertex in data selected.
-    """
-    return get_sel_flags(data.vertices)
-
-
-def get_bounds_and_center(verts):
-    """
-    Calculate the bounds and center for a given set of vertices.
-
-    Parameters
-    ----------
-    verts : numpy.ndarray
-        Vertices to calculate the bounds and center of.
+    points : numpy.ndarray
+        Points to calculate the bounds and center of.
 
     Returns
     -------
     bounds : numpy.ndarray
-        Vector whose coordinates, in each dimension, hold the extents of the
-        minimal bounding volume encompassing every input vertex in 'verts'.
+        Vector whose coordinates, in each dimension, hold the extents
+        of the minimal bounding volume encompassing every input point
     center : numpy.ndarray
-        Average point of the input vertices 'verts'. Note that this point may
-        not be part of 'verts'.
+        Average point of the input points. This point may not be in the
+        input list.
     """
-    co_min = np.amin(verts, axis=0)
-    co_max = np.amax(verts, axis=0)
+    co_min = np.amin(points, axis=0)
+    co_max = np.amax(points, axis=0)
     bounds = co_max - co_min
     center = (co_max + co_min) * 0.5
     return bounds, center
-

@@ -1,12 +1,11 @@
-import bpy
 import bmesh as bm
+import bpy
+from bpy_extras import object_utils
 import numpy as np
 
-from bpy_extras import object_utils
-
-import smorgasbord.common.io as sbio
-import smorgasbord.common.mat_manip as sbmm
-import smorgasbord.common.transf as sbt
+from smorgasbord.common.io import get_bools
+from smorgasbord.common.mat_manip import make_transf_mat
+from smorgasbord.common.transf import transf_vecs
 
 
 def get_unit_cube():
@@ -109,8 +108,8 @@ def add_box_to_scene(
         Name of the box
     """
     verts, faces = get_unit_cube()
-    mat = sbmm.make_transf_mat(location, rotation, size)
-    verts = sbt.transf_verts(mat, verts)
+    mat = make_transf_mat(location, rotation, size)
+    verts = transf_vecs(mat, verts)
 
     bob = bm.new()
     add_geom_to_bmesh(bob, verts, faces)
@@ -161,8 +160,8 @@ def add_box_to_obj(
     # First apply given box transform, then transform it from world to
     # local space
     mat = np.array(ob.matrix_world.inverted()) @ \
-        sbmm.make_transf_mat(location, rotation, size)
-    verts = sbt.transf_verts(mat, verts)
+        make_transf_mat(location, rotation, size)
+    verts = transf_vecs(mat, verts)
 
     add_geom_to_bmesh(bob, verts, faces, select)
     bm.update_edit_mesh(ob.data)
@@ -191,7 +190,7 @@ def remove_selection(data, type='VERTS'):
         geom = data.vertices
         bgeom = bob.verts
 
-    flags = sbio.get_sel_flags(geom)
+    flags = get_bools(geom)
     to_del = np.array(bgeom)[flags]
     bm.ops.delete(bob, geom=to_del, context=type)
 

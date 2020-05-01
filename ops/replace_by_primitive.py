@@ -1,9 +1,9 @@
 import bpy
 import bmesh as bm
 from functools import partial
-import mathutils as mu
+from mathutils import Euler
 import numpy as np
-import statistics as st
+from statistics import mean
 
 import smorgasbord.common.io as sbio
 import smorgasbord.common.mesh_manip as sbmm
@@ -111,9 +111,9 @@ class ReplaceByPrimitive(bpy.types.Operator):
         if self.align_to_axes:
             # If we align sources to world axes, we are interested in
             # the bounds in world coordinates.
-            verts = sbt.transf_verts(mat_wrld, verts)
+            verts = sbt.transf_vecs(mat_wrld, verts)
             # If we align sources to axes, we ignore ob's rotation.
-            rotation = mu.Euler()
+            rotation = Euler()
 
         bounds, center = sbio.get_bounds_and_center(verts)
 
@@ -146,7 +146,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 location=center,
                 rotation=rotation)
         elif self.replace_by == 'CYLINDER_Y':
-            rotation.rotate(mu.Euler((1.57, 0.0, 0.0)))
+            rotation.rotate(Euler((1.57, 0.0, 0.0)))
             bpy.ops.mesh.primitive_cylinder_add(
                 {'active_object': ob},
                 vertices=self.resolution,
@@ -156,7 +156,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 location=center,
                 rotation=rotation)
         elif self.replace_by == 'CYLINDER_X':
-            rotation.rotate(mu.Euler((0.0, 1.57, 0.0)))
+            rotation.rotate(Euler((0.0, 1.57, 0.0)))
             bpy.ops.mesh.primitive_cylinder_add(
                 {'active_object': ob},
                 vertices=self.resolution,
@@ -200,8 +200,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
         all_type_err = True  # no obj is of type mesh
 
         if self.join_select:
-            verts = np.arange(0, dtype=float)
-            verts.shape = (0, 3)
+            coords = np.empty((0, 3), dtype=float)
             ob = context.object if context.object else \
                 context.selected_objects[0]
             mat_wrld_inv = np.array(ob.matrix_world.inverted())
@@ -212,15 +211,15 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 else:
                     continue
 
-                verts_o = sbio.get_verts(o.data)
+                ocoords = sbio.get_vecs(o.data.vertices)
 
                 if o is not ob:
                     mat = mat_wrld_inv @ np.array(o.matrix_world)
-                    verts_o = sbt.transf_verts(mat, verts_o)
+                    ocoords = sbt.transf_vecs(mat, ocoords)
 
-                verts = np.concatenate((verts, verts_o))
+                coords = np.concatenate((coords, ocoords))
 
-            self._core(context, ob, verts, context.selected_objects)
+            self._core(context, ob, coords, context.selected_objects)
         else:
             for o in context.selected_objects:
                 if o.type == 'MESH':
@@ -237,10 +236,11 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 # If we don't align to axes, we aren't interested in the
                 # global ob bounds anyway.
                 rot = np.array(o.matrix_world.to_euler())
-                verts = sbio.get_verts(o.data) if self.align_to_axes \
-                    and rot.dot(rot) > 0.001 else np.array(o.bound_box)
+                coords = sbio.get_vecs(o.data.vertices) \
+                    if self.align_to_axes and rot.dot(rot) > 0.001 \
+                    else np.array(o.bound_box)
 
-                self._core(context, o, verts, [o])
+                self._core(context, o, coords, [o])
 
         if all_type_err:
             self.report({'ERROR_INVALID_INPUT'},
@@ -273,7 +273,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
 
             # apply material index to newly added faces
             ob.update_from_editmode()
-            sel_flags = sbio.get_sel_flags(ob.data.polygons)
+            sel_flags = sbio.get_bools(ob.data.polygons)
             bfaces = bob.faces
             bfaces.ensure_lookup_table()
             for fidx in np.nonzero(sel_flags)[0]:
@@ -284,8 +284,8 @@ class ReplaceByPrimitive(bpy.types.Operator):
             # ensure newest changes from edit mode are
             # visible to data
             o.update_from_editmode()
-            sel_flags = sbio.get_sel_flags(o.data.vertices)
-            return sbio.get_verts(o.data)[sel_flags], sel_flags
+            sel_flags = sbio.get_bools(o.data.vertices)
+            return sbio.get_vecs(o.data.vertices)[sel_flags], sel_flags
 
         if self.join_select:
             verts = np.empty((0, 3), dtype=float)
@@ -300,7 +300,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 # object
                 if o is not ob:
                     mat = mat_wrld_inv @ np.array(o.matrix_world)
-                    verts_o = sbt.transf_verts(mat, verts_o)
+                    verts_o = sbt.transf_vecs(mat, verts_o)
 
                 verts = np.concatenate((verts, verts_o))
 
@@ -318,7 +318,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
         elif self.fit_metric == 'MAX':
             self.metric = max
         else:
-            self.metric = st.mean
+            self.metric = mean
 
         if context.mode == 'EDIT_MESH':
             self._exec_edit_mode(context)

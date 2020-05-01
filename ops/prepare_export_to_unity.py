@@ -36,7 +36,10 @@ class PrepareExportToUnity(bpy.types.Operator):
 
     def execute(self, context):
         if self.prepare_orientation:
-            bpy.ops.transform.resize(value=(-1, -1, 1))
+            bpy.ops.transform.resize(
+                value=(-1, -1, 1),
+                center_override=(0, 0, 0),
+            )
             bpy.ops.transform.rotate(value=1.5708, orient_axis='X')
             bpy.ops.object.transform_apply(
                 location=False,
