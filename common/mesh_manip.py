@@ -1,6 +1,7 @@
 import bmesh as bm
 import bpy
 from bpy_extras import object_utils
+from mathutils import Matrix
 import numpy as np
 
 from smorgasbord.common.io import get_bools
@@ -107,20 +108,17 @@ def add_box_to_scene(
     name : String
         Name of the box
     """
-    verts, faces = get_unit_cube()
-    mat = make_transf_mat(location, rotation, size)
-    verts = transf_vecs(mat, verts)
-
     bob = bm.new()
+    verts, faces = get_unit_cube()
     add_geom_to_bmesh(bob, verts, faces)
-
     mesh = bpy.data.meshes.new(name)
     bob.to_mesh(mesh)
     mesh.update()
 
     # Add the mesh as an object into the scene
-    object_utils.object_data_add(context, mesh)
-
+    ob = object_utils.object_data_add(context, mesh)
+    mat = make_transf_mat(location, rotation, size)
+    ob.matrix_world = Matrix(mat)
 
 def add_box_to_obj(
         ob,
