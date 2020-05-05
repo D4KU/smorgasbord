@@ -43,7 +43,7 @@ def set_vals(geom, vals, attr='co'):
     geom.data.update()
 
 
-def get_bools(geom, attr='select'):
+def get_scalars(geom, attr='select', dtype=np.bool):
     """
     Return Boolean values of a Blender property collection
     as a numpy array.
@@ -54,13 +54,15 @@ def get_bools(geom, attr='select'):
         Geometry to get bools from (vertices, edges, ...)
     attr : string = 'select'
         Boolean attribute to get. Defaults to selection state.
+    dtype : numpy.dtype
+        Numpy data type to store the values in
 
     Returns
     -------
     bs : numpy.ndarray
         Array of Booleans
     """
-    bs = np.empty(len(geom), dtype=np.bool)
+    bs = np.empty(len(geom), dtype=dtype)
     geom.foreach_get(attr, bs)
     return bs
 

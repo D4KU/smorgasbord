@@ -4,7 +4,7 @@ from bpy_extras import object_utils
 from mathutils import Matrix
 import numpy as np
 
-from smorgasbord.common.io import get_bools
+from smorgasbord.common.io import get_scalars
 from smorgasbord.common.mat_manip import make_transf_mat
 from smorgasbord.common.transf import transf_vecs
 
@@ -188,7 +188,7 @@ def remove_selection(data, type='VERTS'):
         geom = data.vertices
         bgeom = bob.verts
 
-    flags = get_bools(geom)
+    flags = get_scalars(geom)
     to_del = np.array(bgeom)[flags]
     bm.ops.delete(bob, geom=to_del, context=type)
 

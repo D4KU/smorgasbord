@@ -71,7 +71,7 @@ class AlignBounds(bpy.types.Operator):
             target.update_from_editmode()
 
             # get selected vertices in target
-            sel_flags_target = sbio.get_bools(tdata.vertices)
+            sel_flags_target = sbio.get_scalars(tdata.vertices)
             tcoords = sbio.get_vecs(tverts)[sel_flags_target]
         else:
             trot = np.array(teuler)
@@ -130,7 +130,7 @@ class AlignBounds(bpy.types.Operator):
                 # get selected vertices in source
                 source.update_from_editmode()
                 sverts_all = sbio.get_vecs(sdata.vertices)
-                sselflags = sbio.get_bools(sdata.vertices)
+                sselflags = sbio.get_scalars(sdata.vertices)
                 sverts_sel = sverts_all[sselflags]
 
                 if len(sverts_sel) < 2:

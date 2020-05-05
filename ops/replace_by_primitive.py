@@ -273,7 +273,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
 
             # apply material index to newly added faces
             ob.update_from_editmode()
-            sel_flags = sbio.get_bools(ob.data.polygons)
+            sel_flags = sbio.get_scalars(ob.data.polygons)
             bfaces = bob.faces
             bfaces.ensure_lookup_table()
             for fidx in np.nonzero(sel_flags)[0]:
@@ -284,7 +284,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
             # ensure newest changes from edit mode are
             # visible to data
             o.update_from_editmode()
-            sel_flags = sbio.get_bools(o.data.vertices)
+            sel_flags = sbio.get_scalars(o.data.vertices)
             return sbio.get_vecs(o.data.vertices)[sel_flags], sel_flags
 
         if self.join_select:
