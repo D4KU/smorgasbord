@@ -1,0 +1,3 @@
+[submodule "thirdparty/redblack"]
+	path = thirdparty/redblack
+	url = git@github.com:D4KU/redblack.git
