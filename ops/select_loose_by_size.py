@@ -2,9 +2,11 @@ import bpy
 import bmesh as bm
 import mathutils as mu
 import numpy as np
+from operator import concat
 
 from smorgasbord.common.io import get_bounds_and_center
 from smorgasbord.common.decorate import register
+from smorgasbord.thirdparty.redblack.redblack import TreeDict
 
 
 def _get_vol_limits(self):
@@ -36,7 +38,7 @@ class SelectLooseBySize(bpy.types.Operator):
         name="Bounding Volume Limits",
         description=(
             "Loose parts whose bounding box's volume lies "
-            "between (min, max] get selected"
+            "between [min, max) get selected"
         ),
         size=2,
         unit='VOLUME',
@@ -49,6 +51,7 @@ class SelectLooseBySize(bpy.types.Operator):
 
     # contains one list of loose parts per selected object
     _obs = []
+    _resolution = 5
 
     @classmethod
     def poll(cls, context):
@@ -73,12 +76,9 @@ class SelectLooseBySize(bpy.types.Operator):
             else:
                 continue
 
-            # loose parts of mesh o
-            parts = []
-            # bmesh representation of object data
-            bdata = bm.from_edit_mesh(data)
-            # bmesh representation of vertices
-            bverts = bdata.verts
+            parts = TreeDict(acc=concat)
+            bdata = bm.from_edit_mesh(data) # bmesh representation of object data
+            bverts = bdata.verts            # bmesh representation of vertices
             bverts.ensure_lookup_table()
 
             # bool array of vertex indices already put on stack 'to_visit'
@@ -112,11 +112,11 @@ class SelectLooseBySize(bpy.types.Operator):
                             checked_indcs[v2.index] = True
 
                 bounds, _ = get_bounds_and_center(coords)
-
-                # append tuple of vertex index list and volume
-                parts.append((indcs, np.prod(bounds)))
-
-            self._obs.append(parts)
+                # calculate volume of bounding box
+                # round to create less bins in dict for better performance
+                key = round(np.prod(bounds), self._resolution)
+                parts[key] = indcs
+            self._obs.append((verts, parts))
 
         if all_type_err:
             self.report({'ERROR_INVALID_INPUT'},
@@ -129,26 +129,20 @@ class SelectLooseBySize(bpy.types.Operator):
         if not self._obs:
             self._find_parts(context)
 
-        for o, parts in zip(
-                context.selected_editable_objects,
-                self._obs,
-        ):
-            data = o.data          # bpy representation of object data
-            verts = data.vertices  # bpy representation of vertices
+        # the mesh doesn't update if we stay in edit mode
+        bpy.ops.object.mode_set(mode='OBJECT')
+        minv, maxv = self._vol_limits
+        try:
+            for verts, parts in self._obs:
+                # bool array of vertex indices storing whether
+                # the vert at that index needs to get selected
+                sel_flags = np.zeros(len(verts), dtype=bool)
+                # set flag for every vertex in a part with right volume
+                for node in parts[minv:maxv]:
+                    sel_flags[node.val] = True
 
-            # bool array of vertex indices storing whether
-            # the vert at that index needs to get selected
-            sel_flags = np.zeros(len(verts), dtype=bool)
-
-            # select small enough loose parts
-            for indcs, vol in parts:
-                # only select loose parts with right volume
-                if self._vol_limits[0] < vol <= self._vol_limits[1]:
-                    sel_flags[indcs] = True
-
-            # somehow the mesh doesn't update if we stay in edit mode
-            bpy.ops.object.mode_set(mode='OBJECT')
-            verts.foreach_set('select', sel_flags)
+                verts.foreach_set('select', sel_flags)
+        finally:
             bpy.ops.object.mode_set(mode='EDIT')
 
         # because only vertices are updated, ensure selection is also
