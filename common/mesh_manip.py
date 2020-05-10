@@ -120,6 +120,7 @@ def add_box_to_scene(
     mat = make_transf_mat(location, rotation, size)
     ob.matrix_world = Matrix(mat)
 
+
 def add_box_to_obj(
         ob,
         location=np.zeros(3),

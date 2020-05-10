@@ -13,6 +13,13 @@ def _res_heur(data, *args, **kwargs):
     """
     return 3 * len(data) ** 0.33333333
 
+def quantize(pts, binlen):
+    """
+    Quantizes a given point according to the voxel grid resolution.
+    @TODO document
+    """
+    return binlen * np.round(np.asanyarray(pts) / binlen)
+
 
 class SpatialHasher:
     """
@@ -39,7 +46,7 @@ class SpatialHasher:
         # Quantize data and bring in a form that can be broadcast by
         # NumPy. For N vertices, this transforms the array from
         # (N, 3) to (N, 1, 3) dimensions.
-        qdata = self.quantize(data)[:, np.newaxis]
+        qdata = quantize(data, self.celllen)[:, np.newaxis]
 
         # Generate voxel kernel from all 3**3 = 27 combinations of
         # -1, 0, and 1.
@@ -61,18 +68,12 @@ class SpatialHasher:
             # Store index in data array for each of the 27 entries.
             self.hash[tuple(c)] += [floor(i / 27)]
 
-    def quantize(self, p):
-        """
-        Quantizes a given point according to the voxel grid resolution.
-        """
-        return np.round(np.asarray(p) * self.celllen)
-
     def find_close(self, p):
         """
         Returns a list of data indices in the vicinity of the given
         point.
         """
-        return self.hash(tuple(self.quantize(p)))
+        return self.hash(tuple(quantize(p, self.celllen)))
 
     def find_closest(self, p):
         """

@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def get_vecs(geom, attr='co', vecsize=3):
+def get_vecs(geom, attr='co', vecsize=3, dtype=np.float64):
     """
     Return vector values of a Blender property collection
     as a numpy array.
@@ -14,13 +14,15 @@ def get_vecs(geom, attr='co', vecsize=3):
         Vector vertex attribute to get. Defaults to coordinates.
     vecsize : int = 3
         Size of vectors to get.
+    dtype : numpy.dtype
+        Numpy data type to store the values in
 
     Returns
     -------
     vs : numpy.ndarray
         Array of vectors.
     """
-    vs = np.empty(len(geom) * vecsize, dtype=np.float64)
+    vs = np.empty(len(geom) * vecsize, dtype=dtype)
     geom.foreach_get(attr, vs)
     vs.shape = (-1, vecsize)
     return vs
