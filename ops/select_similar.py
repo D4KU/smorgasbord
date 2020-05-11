@@ -1,13 +1,12 @@
 import bpy
 from bpy_extras import object_utils
+import bgl
+import gpu
+from gpu_extras.batch import batch_for_shader
 import numpy as np
-import matplotlib
-import sys
-# sys.path.append('/usr/lib/python3.7/tkinter/')
-# matplotlib.use('TKAgg', warn=True, force=True)
-import matplotlib.pyplot as plt
 
 from smorgasbord.common.io import get_scalars, get_vecs, get_bounds_and_center
+from smorgasbord.common.transf import transf_vecs
 from smorgasbord.common.decorate import register
 from smorgasbord.common.mesh_manip import add_geom_to_bmesh
 from smorgasbord.common.spatial_hasher import quantize
@@ -78,13 +77,31 @@ def sample_surf(mesh, samplecnt=1000):
     return np.sum(coef * tris, axis=1)
 
 
-def create_debug_mesh(pts):
+def create_debug_mesh(context, pts):
+    import bmesh as bm
     bob = bm.new()
     add_geom_to_bmesh(bob, pts, [])
     mesh = bpy.data.meshes.new("Samples")
     bob.to_mesh(mesh)
     mesh.update()
     object_utils.object_data_add(context, mesh)
+
+
+def save_barplot(xvals, yvals, barwidth, xmax, title, filename):
+    import matplotlib.pyplot as plt
+    plt.clf()
+    plt.xlim(right=xmax)
+    plt.title(title)
+    plt.bar(xvals, yvals, barwidth)
+    plt.savefig(filename + ".png")
+
+
+def draw_points(pts):
+    shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
+    batch = batch_for_shader(shader, 'POINTS', {"pos": tuple(pts)})
+    shader.bind()
+    shader.uniform_float("color", (0.8, 0.3, 0.4, 1))
+    batch.draw(shader)
 
 
 @register
@@ -98,17 +115,21 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
     samplecnt: bpy.props.IntProperty(
         name="Sample count, even number",
         description="",
-        default=10000,
-        min=2,
-        max=10000,
+        default=512,
+        min=16,
+        max=16384,
+        soft_min=64,
+        soft_max=1024,
         step=2,
     )
     bincnt: bpy.props.IntProperty(
         name="Bin count",
         description="",
-        default=1024,
-        min=1,
-        max=1024,
+        default=64,
+        min=2,
+        max=8192,
+        soft_min=16,
+        soft_max=512,
     )
     # vertcnt: bpy.props.IntProperty(
     #     name="Vertex count",
@@ -117,45 +138,75 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
     #     min=2,
     #     max=16,
     # )
-    norm: bpy.props.IntProperty(
-        name="Distance Norm",
-        description="",
-        default=1,
-        min=1,
-        max=4,
-    )
+    # norm: bpy.props.IntProperty(
+    #     name="Distance Norm",
+    #     description="",
+    #     default=1,
+    #     min=1,
+    #     max=4,
+    # )
+    handle = None
+
+    def __del__(self):
+        self.remove_handle()
 
     @classmethod
     def poll(cls, context):
         return len(context.selected_objects) > 0
+
+    def remove_handle(self):
+        if self.handle is not None:
+            bpy.types.SpaceView3D.draw_handler_remove(
+                self.handle,
+                'WINDOW',
+                )
+
+    def draw_samples(self, context, pts):
+        if context.area.type != 'VIEW_3D':
+            self.report(
+                {'WARNING'},
+                "Samples can only be drawn in the 3D View",
+                )
+            return
+
+        self.remove_handle()
+        self.handle = bpy.types.SpaceView3D.draw_handler_add(
+            draw_points,
+            (pts,),
+            'WINDOW',
+            'POST_VIEW',
+            )
+        context.area.tag_redraw()
 
     def execute(self, context):
         for o in context.selected_objects:
             if o.type != 'MESH':
                 continue
             pts = sample_surf(o.data, self.samplecnt)
-            dist = np.diff(pts.reshape(-1, 2, 3), axis=1)
-            dist = np.linalg.norm(dist, ord=self.norm, axis=2).ravel()
+            self.draw_samples(context, transf_vecs(o.matrix_world, pts))
+
+            # k=1 eliminates diagonal indices
+            i, j = np.triu_indices(self.samplecnt, k=1)
+            dist = np.linalg.norm(pts[i] - pts[j], axis=1).ravel()
+            del i, j
 
             bounds, _ = get_bounds_and_center(o.bound_box)
-            maxdist = np.ceil(np.linalg.norm(bounds, ord=self.norm))
+            maxdist = np.ceil(np.linalg.norm(bounds))
             dist = quantize(dist, maxdist / self.bincnt)
             unique, counts = np.unique(dist, return_counts=True)
 
-            plt.clf()
-            plt.xlim(right=maxdist)
-            plt.title((
-                f"Samples: {self.samplecnt}, "
-                f"Bins: {self.bincnt}, "
-                f"Diaglength: {maxdist}",
-            ))
-            plt.bar(
-                unique,
-                counts / self.samplecnt,
-                maxdist / self.bincnt,
+            save_barplot(
+                xvals=unique,
+                yvals=counts / self.samplecnt,
+                barwidth=maxdist / self.bincnt,
+                xmax=maxdist,
+                title=(
+                    f"Samples: {self.samplecnt}, "
+                    f"Bins: {self.bincnt}, "
+                    f"Diaglength: {maxdist}",
+                ),
+                filename=o.name,
                 )
-            plt.savefig(o.name + ".png")
-
         return {'FINISHED'}
 
 
