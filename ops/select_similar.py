@@ -4,15 +4,16 @@ import bgl
 import gpu
 from gpu_extras.batch import batch_for_shader
 import numpy as np
+from operator import concat
 
 from smorgasbord.common.io import get_scalars, get_vecs, get_bounds_and_center
 from smorgasbord.common.transf import transf_vecs
 from smorgasbord.common.decorate import register
 from smorgasbord.common.mesh_manip import add_geom_to_bmesh
-from smorgasbord.common.spatial_hasher import quantize
+from smorgasbord.thirdparty.redblack.redblack import TreeDict
 
 
-def sample_surf(mesh, samplecnt=1000):
+def sample_surf(mesh, samplecnt=1024):
     """
     Draw N random samples on the surface of a triangle mesh.
 
@@ -20,7 +21,7 @@ def sample_surf(mesh, samplecnt=1000):
     ----------
     mesh : bpy.types.Mesh
         Blender triangle mesh to sample from.
-    samplecnt : int = 1000
+    samplecnt : int = 1024
         Number of samples to draw.
 
     Returns
@@ -77,6 +78,17 @@ def sample_surf(mesh, samplecnt=1000):
     return np.sum(coef * tris, axis=1)
 
 
+def get_shape_distrib(mesh, samplecnt=1024, bincnt=32):
+    pts = sample_surf(mesh, samplecnt)
+    # k=1 eliminates diagonal indices
+    i, j = np.triu_indices(samplecnt, k=1)
+    return np.histogram(
+        np.linalg.norm(pts[i] - pts[j], axis=1),
+        bins=bincnt,
+        density=True,
+        )[0]
+
+
 def create_debug_mesh(context, pts):
     import bmesh as bm
     bob = bm.new()
@@ -90,7 +102,7 @@ def create_debug_mesh(context, pts):
 def save_barplot(xvals, yvals, barwidth, xmax, title, filename):
     import matplotlib.pyplot as plt
     plt.clf()
-    plt.xlim(right=xmax)
+    # plt.xlim(right=xmax)
     plt.title(title)
     plt.bar(xvals, yvals, barwidth)
     plt.savefig(filename + ".png")
@@ -104,17 +116,40 @@ def draw_points(pts):
     batch.draw(shader)
 
 
+def _get_sim_limits(self):
+    return SelectSimilar._sim_limits
+
+
+def _set_sim_limits(self, value):
+    # clamp min to max
+    SelectSimilar._sim_limits = (min(value), value[1])
+
+
 @register
-class ReplaceDuplicateMaterials(bpy.types.Operator):
+class SelectSimilar(bpy.types.Operator):
     bl_idname = "select.select_similar"
     bl_label = "Select Similar"
     bl_description = ""
     bl_options = {'REGISTER', 'UNDO'}
     menus = [bpy.types.VIEW3D_MT_select_object]
 
+    # to prevent infinite recursion in getter and setter
+    _sim_limits = (0.0, 1.0)
+    sim_limits: bpy.props.FloatVectorProperty(
+        name="Similarity limits",
+        description=(
+            ""
+        ),
+        size=2,
+        step=10,
+        default=(0.0, 1.0),
+        min=0.0,
+        get=_get_sim_limits,
+        set=_set_sim_limits,
+    )
     samplecnt: bpy.props.IntProperty(
-        name="Sample count, even number",
-        description="",
+        name="Sample count",
+        description="Even",
         default=512,
         min=16,
         max=16384,
@@ -125,51 +160,42 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
     bincnt: bpy.props.IntProperty(
         name="Bin count",
         description="",
-        default=64,
+        default=32,
         min=2,
         max=8192,
         soft_min=16,
         soft_max=512,
     )
-    # vertcnt: bpy.props.IntProperty(
-    #     name="Vertex count",
-    #     description="",
-    #     default=4,
-    #     min=2,
-    #     max=16,
-    # )
-    # norm: bpy.props.IntProperty(
-    #     name="Distance Norm",
-    #     description="",
-    #     default=1,
-    #     min=1,
-    #     max=4,
-    # )
     handle = None
-
-    def __del__(self):
-        self.remove_handle()
+    svals = TreeDict(acc=concat)
 
     @classmethod
     def poll(cls, context):
-        return len(context.selected_objects) > 0
+        return (
+            len(context.selected_objects) > 1
+            and context.mode == 'OBJECT'
+            and context.object is not None
+            and context.object.type == 'MESH'
+            )
 
-    def remove_handle(self):
+    def invoke(self, context, event):
+        if self._comp_shape_distribs(context):
+            return self.execute(context)
+        else:
+            return {'CANCELLED'}
+
+    def _remove_handle(self):
         if self.handle is not None:
             bpy.types.SpaceView3D.draw_handler_remove(
-                self.handle,
-                'WINDOW',
-                )
+                self.handle, 'WINDOW')
 
-    def draw_samples(self, context, pts):
+    def _draw_samples(self, context, pts):
         if context.area.type != 'VIEW_3D':
-            self.report(
-                {'WARNING'},
-                "Samples can only be drawn in the 3D View",
-                )
+            self.report({'WARNING'},
+                "Samples can only be drawn in the 3D View")
             return
 
-        self.remove_handle()
+        self._remove_handle()
         self.handle = bpy.types.SpaceView3D.draw_handler_add(
             draw_points,
             (pts,),
@@ -178,35 +204,55 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
             )
         context.area.tag_redraw()
 
-    def execute(self, context):
+    def _comp_shape_distribs(self, context):
+        self.svals.clear()
+        all_type_err = True  # no obj is of type mesh
+
+        ahist = get_shape_distrib(
+            context.object.data,
+            self.samplecnt,
+            self.bincnt,
+        )
         for o in context.selected_objects:
-            if o.type != 'MESH':
+            if o.type == 'MESH' and o is not context.object:
+                all_type_err = False
+            else:
                 continue
-            pts = sample_surf(o.data, self.samplecnt)
-            self.draw_samples(context, transf_vecs(o.matrix_world, pts))
 
-            # k=1 eliminates diagonal indices
-            i, j = np.triu_indices(self.samplecnt, k=1)
-            dist = np.linalg.norm(pts[i] - pts[j], axis=1).ravel()
-            del i, j
+            bhist = get_shape_distrib(
+                o.data,
+                self.samplecnt,
+                self.bincnt,
+            )
+            self.svals[np.linalg.norm(bhist - ahist, ord=1)] = [o]
 
-            bounds, _ = get_bounds_and_center(o.bound_box)
-            maxdist = np.ceil(np.linalg.norm(bounds))
-            dist = quantize(dist, maxdist / self.bincnt)
-            unique, counts = np.unique(dist, return_counts=True)
+        if all_type_err:
+            self.report({'ERROR_INVALID_INPUT'},
+                        "An object must be of type mesh")
+            return False
+        return True
 
-            save_barplot(
-                xvals=unique,
-                yvals=counts / self.samplecnt,
-                barwidth=maxdist / self.bincnt,
-                xmax=maxdist,
-                title=(
-                    f"Samples: {self.samplecnt}, "
-                    f"Bins: {self.bincnt}, "
-                    f"Diaglength: {maxdist}",
-                ),
-                filename=o.name,
-                )
+    def execute(self, context):
+        print('EX')
+        mins, maxs = self._sim_limits
+        for node in self.svals[mins:maxs]:
+            for o in node.val:
+                o.select_set(True)
+
+        # bounds, _ = get_bounds_and_center(o.bound_box)
+        # maxdist = np.linalg.norm(bounds)
+        # save_barplot(
+        #     xvals=hist,
+        #     yvals=bins[:-1],
+        #     barwidth=maxdist / self.bincnt,
+        #     xmax=maxdist,
+        #     title=(
+        #         f"Samples: {self.samplecnt}, "
+        #         f"Bins: {self.bincnt}, "
+        #         f"Diaglength: {maxdist}",
+        #     ),
+        #     filename=o.name,
+        #     )
         return {'FINISHED'}
 
 
