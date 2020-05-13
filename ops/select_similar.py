@@ -3,14 +3,13 @@ from bpy_extras import object_utils
 import bgl
 import gpu
 from gpu_extras.batch import batch_for_shader
+from math import ceil, sqrt
 import numpy as np
-from operator import concat
 
 from smorgasbord.common.io import get_scalars, get_vecs, get_bounds_and_center
 from smorgasbord.common.transf import transf_vecs
 from smorgasbord.common.decorate import register
 from smorgasbord.common.mesh_manip import add_geom_to_bmesh
-from smorgasbord.thirdparty.redblack.redblack import TreeDict
 
 
 def sample_surf(mesh, samplecnt=1024):
@@ -86,7 +85,7 @@ def get_shape_distrib(mesh, samplecnt=1024, bincnt=32):
         np.linalg.norm(pts[i] - pts[j], axis=1),
         bins=bincnt,
         density=True,
-        )[0]
+        )
 
 
 def create_debug_mesh(context, pts):
@@ -116,15 +115,6 @@ def draw_points(pts):
     batch.draw(shader)
 
 
-def _get_sim_limits(self):
-    return SelectSimilar._sim_limits
-
-
-def _set_sim_limits(self, value):
-    # clamp min to max
-    SelectSimilar._sim_limits = (min(value), value[1])
-
-
 @register
 class SelectSimilar(bpy.types.Operator):
     bl_idname = "select.select_similar"
@@ -133,56 +123,62 @@ class SelectSimilar(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
     menus = [bpy.types.VIEW3D_MT_select_object]
 
-    # to prevent infinite recursion in getter and setter
-    _sim_limits = (0.0, 1.0)
+    def _get_sim_limits(self):
+        return SelectSimilar._sim_limits
+
+    def _set_sim_limits(self, val):
+        # Clamp min to max
+        SelectSimilar._sim_limits = (min(val), val[1])
+
+    def _get_samplecnt(self):
+        return SelectSimilar._samplecnt
+
+    def _set_samplecnt(self, val):
+        SelectSimilar._samplecnt = val
+        SelectSimilar.bincnt = ceil(sqrt(val))
+
+    _sim_limits = (0, 1)
     sim_limits: bpy.props.FloatVectorProperty(
         name="Similarity limits",
         description=(
-            ""
+            "Select objects whose shape differs more than min and less "
+            "than max from the active objects' shape"
         ),
         size=2,
         step=10,
-        default=(0.0, 1.0),
-        min=0.0,
+        default=(0, 1),
+        min=0,
         get=_get_sim_limits,
         set=_set_sim_limits,
     )
+    _samplecnt = 512
     samplecnt: bpy.props.IntProperty(
         name="Sample count",
-        description="Even",
-        default=512,
+        description=(
+            "Number of samples taken to compute a simple shape "
+            "representation for every object to be compared. More "
+            "samples improve accuracy, at the expense of computation "
+            "time"
+        ),
+        default=1024,
         min=16,
         max=16384,
         soft_min=64,
         soft_max=1024,
         step=2,
+        set=_set_samplecnt,
+        get=_get_samplecnt,
     )
-    bincnt: bpy.props.IntProperty(
-        name="Bin count",
-        description="",
-        default=32,
-        min=2,
-        max=8192,
-        soft_min=16,
-        soft_max=512,
-    )
+    bincnt = 32
     handle = None
-    svals = TreeDict(acc=concat)
+    svals = {}
 
     @classmethod
     def poll(cls, context):
-        return (
-            len(context.selected_objects) > 1
-            and context.mode == 'OBJECT'
+        return (context.mode == 'OBJECT'
             and context.object is not None
             and context.object.type == 'MESH'
             )
-
-    def invoke(self, context, event):
-        if self._comp_shape_distribs(context):
-            return self.execute(context)
-        else:
-            return {'CANCELLED'}
 
     def _remove_handle(self):
         if self.handle is not None:
@@ -204,27 +200,50 @@ class SelectSimilar(bpy.types.Operator):
             )
         context.area.tag_redraw()
 
+    def _save_bar_plot(self, ob, xvals, yvals):
+        bounds, _ = get_bounds_and_center(ob.bound_box)
+        maxdist = np.linalg.norm(bounds)
+        save_barplot(
+            xvals=xvals,
+            yvals=yvals[:-1],
+            barwidth=maxdist / self.bincnt,
+            xmax=maxdist,
+            title=(
+                f"Samples: {self._samplecnt}, "
+                f"Bins: {self.bincnt}, "
+                f"Diaglength: {maxdist}"
+            ),
+            filename=ob.name,
+            )
+
     def _comp_shape_distribs(self, context):
         self.svals.clear()
         all_type_err = True  # no obj is of type mesh
-
-        ahist = get_shape_distrib(
-            context.object.data,
-            self.samplecnt,
+        ob = context.object
+        ahist, abins = get_shape_distrib(
+            ob.data,
+            self._samplecnt,
             self.bincnt,
         )
-        for o in context.selected_objects:
-            if o.type == 'MESH' and o is not context.object:
-                all_type_err = False
-            else:
+        self._save_bar_plot(ob, ahist, abins)
+
+        # Compare only selection if selection exists, compare all
+        # objects in the active collection if not.
+        selobs = context.selected_objects
+        if len(selobs) < 2:
+            selobs = context.collection.objects
+        for o in selobs:
+            if o.type != 'MESH' or o is ob:
                 continue
 
-            bhist = get_shape_distrib(
+            all_type_err = False
+            ohist, obins = get_shape_distrib(
                 o.data,
-                self.samplecnt,
+                self._samplecnt,
                 self.bincnt,
             )
-            self.svals[np.linalg.norm(bhist - ahist, ord=1)] = [o]
+            self._save_bar_plot(o, ohist, obins)
+            self.svals[o.name] = np.linalg.norm(ohist - ahist, ord=1)
 
         if all_type_err:
             self.report({'ERROR_INVALID_INPUT'},
@@ -232,27 +251,20 @@ class SelectSimilar(bpy.types.Operator):
             return False
         return True
 
-    def execute(self, context):
-        print('EX')
-        mins, maxs = self._sim_limits
-        for node in self.svals[mins:maxs]:
-            for o in node.val:
-                o.select_set(True)
+    def invoke(self, context, event):
+        if self._comp_shape_distribs(context):
+            return self.execute(context)
+        else:
+            return {'CANCELLED'}
 
-        # bounds, _ = get_bounds_and_center(o.bound_box)
-        # maxdist = np.linalg.norm(bounds)
-        # save_barplot(
-        #     xvals=hist,
-        #     yvals=bins[:-1],
-        #     barwidth=maxdist / self.bincnt,
-        #     xmax=maxdist,
-        #     title=(
-        #         f"Samples: {self.samplecnt}, "
-        #         f"Bins: {self.bincnt}, "
-        #         f"Diaglength: {maxdist}",
-        #     ),
-        #     filename=o.name,
-        #     )
+    def execute(self, context):
+        if not self.svals:
+            self.report({'ERROR_INVALID_INPUT'}, "Sample first")
+            return {'CANCELLED'}
+
+        mins, maxs = self.sim_limits
+        for name, simval in self.svals.items():
+            bpy.data.objects[name].select_set(mins <= simval < maxs)
         return {'FINISHED'}
 
 
