@@ -43,7 +43,7 @@ def transf_vecs(mat, vecs):
     vecs : numpy.ndarray
         Copy of 'vecs' with transformed coordinates
     """
-    return (mat @ homog_vecs(vecs).T).T[:, :3]
+    return (np.asanyarray(mat) @ homog_vecs(vecs).T).T[:, :3]
 
 
 def transf_point(mat, point):
