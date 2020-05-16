@@ -1,6 +1,7 @@
 from smorgasbord.ops import (
     align_bounds,
     apply_name,
+    lerp_weight,
     material_transfer,
     prepare_export_to_unity,
     replace_by_primitive,
