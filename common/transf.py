@@ -43,7 +43,7 @@ def transf_vecs(mat, vecs):
     vecs : numpy.ndarray
         Copy of 'vecs' with transformed coordinates
     """
-    return (mat @ homog_vecs(vecs).T).T[:, :3]
+    return (np.asanyarray(mat) @ homog_vecs(vecs).T).T[:, :3]
 
 
 def transf_point(mat, point):
@@ -62,7 +62,7 @@ def transf_point(mat, point):
     vecs : numpy.ndarray
         Copy of 'point' with transformed coordinates.
     """
-    return (mat @ np.append(point, 1))[:3]
+    return (np.asanyarray(mat) @ np.append(point, 1))[:3]
 
 
 def transf_dist(mat, dist):
@@ -82,3 +82,23 @@ def transf_dist(mat, dist):
         Copy of 'dist' with transformed coordinates.
     """
     return np.asanyarray(mat)[:3, :3] @ dist
+
+
+def lerp(start, end, alpha):
+    return start * (1 - alpha) + end * alpha
+
+
+def invlerp(start, end, alpha):
+    return (alpha - start) / (end - start)
+
+
+def lerpclip(start, end, alpha):
+    out = lerp(start, end, alpha)
+    np.clip(out, start, end, out=out)
+    return out
+
+
+def invlerpclip(start, end, alpha):
+    out = invlerp(start, end, alpha)
+    np.clip(out, 0, 1, out=out)
+    return out

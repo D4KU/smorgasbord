@@ -2,7 +2,7 @@ import bpy
 import numpy as np
 
 from smorgasbord.common.io import get_scalars, get_vecs
-from smorgasbord.common.transf import transf_vecs
+from smorgasbord.common.transf import transf_vecs, transf_point
 from smorgasbord.common.decorate import register
 
 
@@ -54,16 +54,20 @@ class LerpWeight(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return (
-            context.mode == 'EDIT_MESH'
-            and len(context.selected_objects) > 1
+            (
+                context.mode == 'EDIT_MESH'
+                or context.mode == 'PAINT_WEIGHT'
             )
+            and len(context.selected_objects) > 1
+        )
 
     def execute(self, context):
-        if not self.bone1:
+        if not (self.bone1 and self.bone2):
             # This little hack allows the user to insert the bone names
             # in the F9 panel before the operator really executes.
             return {'FINISHED'}
 
+        mode = context.mode
         selobs = context.selected_objects
         arms = [o for o in selobs if o.type == 'ARMATURE']
 
@@ -75,47 +79,71 @@ class LerpWeight(bpy.types.Operator):
         arm = arms[0]
         bones = arm.data.bones
         try:
-            b1 = np.array(bones[self.bone1].head)
-            b2 = np.array(bones[self.bone2].head)
+            b1 = bones[self.bone1]
         except KeyError:
             self.report(
                 {'ERROR_INVALID_INPUT'},
                 (
-                    f"Bone '{self.bone1}' or '{self.bone2}' doesn't "
-                    "exist in armature '{arm.name}'"
+                    f"Bone '{self.bone1}' doesn't exist in armature "
+                    "'{arm.name}'"
                 ),
             )
             return {'CANCELLED'}
-        b1b2 = b2 - b1
+        try:
+            b2 = bones[self.bone2]
+        except KeyError:
+            self.report(
+                {'ERROR_INVALID_INPUT'},
+                (
+                    f"Bone '{self.bone2}' doesn't exist in armature "
+                    "'{arm.name}'"
+                ),
+            )
+            return {'CANCELLED'}
 
-        wrldmat_inv = np.array(arm.matrix_world.inverted())
+        # Transform bones into world system
+        arm2wrld = np.array(arm.matrix_world)
+        b1 = transf_point(arm2wrld, b1.head_local)
+        b2 = transf_point(arm2wrld, b2.head_local)
+
         dims = np.array(self.axes)
         ndims = np.sum(dims)
+
+        # Vector from bone1 to bone2, if wished projected onto the
+        # axis/plane isolated through the 'axes' parameter by zeroing
+        # coordinates in ignored dimensions
+        b1b2 = (b2 - b1) * dims
+
+        # Squared distance between the bones
+        sqrbdist = np.linalg.norm(b1b2) ** 2
+
+        if sqrbdist == 0:
+            # If both bones are in the same position after projection,
+            # we can't interpolate between them.
+            # This way, bone1 is assigned a weight of one.
+            sqrbdist = 1e-15
 
         for o in selobs:
             if o.type != 'MESH':
                 continue
 
             # Get selected vertices
+            o.update_from_editmode()
             verts = o.data.vertices
             selflags = get_scalars(verts)
             pts = get_vecs(verts)[selflags]
 
-            # Transform vertices into the armature's local coordinate
-            # system
-            pts = transf_vecs(
-                wrldmat_inv @ np.array(o.matrix_world),
-                pts,
-                )
+            # Also transform vertices into the world system
+            pts = transf_vecs(o.matrix_world, pts)
             # Calc vector from bone1 to every point and zero coordinates
             # of dimensions that are ignored.
-            b1pts_proj = (pts - b1) * dims
-            # Calc dot product those vectors and the vector from bone1
+            b1pts = (pts - b1) * dims
+            # Calc dot product of this vector and the vector from bone1
             # to bone2
-            weights = np.dot(b1b2, b1pts_proj.T)
-            # Calc reciprocal where weight is not zero. Multiply with
-            # the total number of dimensions we considered.
-            np.divide(ndims, weights, out=weights, where=weights != 0)
+            # Get final weight by dividing through the squared bone
+            # distance
+            weights = np.dot(b1b2, b1pts.T) / sqrbdist
+            # breakpoint()
 
             # Get indices of selected vertices
             indcs = np.arange(len(selflags))[selflags]
@@ -156,7 +184,12 @@ class LerpWeight(bpy.types.Operator):
                     if self.bidirect:
                         vg2.add(idx, w, 'REPLACE')
             finally:
-                bpy.ops.object.mode_set(mode='EDIT')
+                # This is so stupid Blender! Why not make those
+                # strings match!?
+                if mode == 'PAINT_WEIGHT':
+                    bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
+                else:
+                    bpy.ops.object.mode_set(mode='EDIT')
         return {'FINISHED'}
 
 

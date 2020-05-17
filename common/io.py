@@ -92,3 +92,49 @@ def get_bounds_and_center(points):
     bounds = co_max - co_min
     center = (co_max + co_min) * 0.5
     return bounds, center
+
+
+def get_parts(verts):
+    """
+    Group vertex indices into disjunct parts so that no vertex in one
+    part is connected to any vertex in another part over an arbitrary
+    sequence of edges.
+
+    Parameters
+    ----------
+    verts : bmesh.BMVertSequence
+        Bmesh vertex list to group into parts
+
+    Returns
+    -------
+    parts : List[List[int]]
+        List of parts. Each part in turn is a list of vertex indices.
+    """
+    # Bool array of vertex indices already pushed on stack
+    flags = np.zeros(len(verts), dtype=bool)
+    verts.ensure_lookup_table()
+    parts = []
+
+    for idx, visited in enumerate(flags):
+        if visited:
+            continue
+
+        # Vertex indices of one loose part
+        indcs = []
+        # Vertices to be traversed
+        stack = [verts[idx]]
+        flags[idx] = True
+
+        while stack:
+            v = stack.pop()
+            indcs.append(v.index)
+
+            # Push all vertices connected to v on stack
+            for e in v.link_edges:
+                v2 = e.other_vert(v)
+                # but only if not already checked
+                if not flags[v2.index]:
+                    stack.append(v2)
+                    flags[v2.index] = True
+        parts.append(indcs)
+    return parts
