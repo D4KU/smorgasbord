@@ -83,5 +83,4 @@ def get_shape_distrib(points, bincnt=32):
     return np.histogram(
         np.linalg.norm(points[i] - points[j], axis=1),
         bins=bincnt,
-        density=True,
         )

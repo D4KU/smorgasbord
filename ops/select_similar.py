@@ -83,7 +83,10 @@ class SelectSimilar(bpy.types.Operator):
     # Stores bgl handles for drawing the sample positions
     _gl_handls = []
     # Save a plot of every calculated shape distribution to disk?
-    _save_plot = False
+    save_plot: bpy.props.BoolProperty(
+        name="Save Plot",
+        default=False,
+    )
 
     def __del__(self):
         self._gl_handls.clear()
@@ -95,7 +98,7 @@ class SelectSimilar(bpy.types.Operator):
             and context.object.type == 'MESH'
             )
 
-    def _save_bar_plot(self, ob, xvals, yvals):
+    def _save_barplot(self, ob, xvals, yvals):
         """
         Helper for saving a plot of an object's shape distribution
         to disk.
@@ -106,8 +109,8 @@ class SelectSimilar(bpy.types.Operator):
         bounds, _ = get_bounds_and_center(ob.bound_box)
         maxdist = np.linalg.norm(bounds)
         save_barplot(
-            xvals=xvals,
-            yvals=yvals[:-1],
+            xvals=xvals[:-1],
+            yvals=yvals,
             barwidth=maxdist / self.bincnt,
             # xmax=maxdist,
             title=(
@@ -138,8 +141,8 @@ class SelectSimilar(bpy.types.Operator):
 
         # Calc and plot shape distribution
         hist, bins = get_shape_distrib(points, self.bincnt)
-        if self._save_plot:
-            self._save_bar_plot(ob, hist, bins)
+        if self.save_plot:
+            self._save_barplot(ob, bins, hist)
         return hist
 
     def _comp_shape_distribs(self, context):
@@ -174,7 +177,8 @@ class SelectSimilar(bpy.types.Operator):
             # those references become invalid on undo, which is
             # triggered every time this operator is re-executed with
             # different parameters
-            self.svals[o.name] = np.linalg.norm(odis - adis, ord=1)
+            self.svals[o.name] = \
+                np.linalg.norm(odis - adis, ord=1) / self._samplcnt
 
         if all_type_err:
             self.report({'ERROR_INVALID_INPUT'},
