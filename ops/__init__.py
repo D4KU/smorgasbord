@@ -8,6 +8,7 @@ from smorgasbord.ops import (
     replace_duplicate_materials,
     select_by_name,
     select_loose_by_size,
+    select_similar,
     set_parent_advanced,
 )
 

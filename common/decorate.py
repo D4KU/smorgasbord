@@ -33,3 +33,13 @@ def register(cls):
 
     setattr(sys.modules[cls.__module__], 'register', register)
     return cls
+
+
+# def pass_to(recipient):
+#     def decorator(decoratee):
+#         def wrap(*args, **kwargs):
+#             ret = decoratee(*args, **kwargs)
+#             recipient(ret)
+#             return ret
+#         return wrap
+#     return decorator
