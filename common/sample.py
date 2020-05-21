@@ -1,4 +1,5 @@
 import bpy
+import bmesh as bm
 import numpy as np
 
 from smorgasbord.common.io import get_scalars, get_vecs
@@ -21,6 +22,17 @@ def sample_surf(mesh, samplecnt=1024):
         2D array with shape (N, 3), containing the coordinates of the
         N drawn sample points.
     """
+    # Load mesh into bmesh,
+    bob = bm.new()
+    bob.from_mesh(mesh, face_normals=False)
+    # triangulate it,
+    bm.ops.triangulate(bob, faces=bob.faces)
+    # and save it back to a temporary mesh, so that we can use
+    # Blenders' fast-access foreach functions to get vectorized data.
+    mesh = bpy.data.meshes.new("tmp")
+    bob.to_mesh(mesh)
+    del bob
+
     # Accumulate all triangle areas in the mesh to sample each triangle
     # with a probability proportional to its surface area.
     areas = get_scalars(mesh.polygons, 'area', np.float64)
@@ -39,6 +51,7 @@ def sample_surf(mesh, samplecnt=1024):
     pts = get_vecs(mesh.vertices)
     # Get the vertex indices for each triangle.
     tris = get_vecs(mesh.polygons, 'vertices', dtype=np.int32)
+    bpy.data.meshes.remove(mesh)
     # Inner indexing operation: For each randomly chosen triangle index,
     # insert the actual vertex indices of the corresponding triangle
     # into the array.

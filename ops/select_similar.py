@@ -7,7 +7,7 @@ from smorgasbord.common.transf import transf_vecs
 from smorgasbord.common.decorate import register
 from smorgasbord.common.draw import draw_points, View3DDrawer
 from smorgasbord.common.sample import sample_surf, get_shape_distrib
-from smorgasbord.debug.plot import save_barplot
+# from smorgasbord.debug.plot import save_barplot
 
 
 @register
@@ -57,20 +57,27 @@ class SelectSimilar(bpy.types.Operator):
     samplcnt: bpy.props.IntProperty(
         name="Sample count",
         description=(
-            "Number of samples taken to compute a simple shape "
-            "representation for every object to be compared. More "
-            "samples improve accuracy, at the expense of computation "
-            "time"
+            "Number of samples taken on a mesh's surface to compute a "
+            "simple shape representation for every object to be "
+            "compared. More samples improve accuracy, at the expense "
+            "of computation time"
         ),
         default=_samplcnt,
-        min=16,
-        max=16384,
-        soft_min=64,
-        soft_max=1024,
+        min=2,
+        max=16392,
+        soft_min=16,
+        soft_max=2048,
         step=2,
         set=_set_samplecnt,
         get=_get_samplecnt,
         update=_update_samplecnt,
+    )
+    draw_sampls: bpy.props.BoolProperty(
+        name="Draw Samples",
+        description=(
+            "Draw sample points as small white dots in the scene"
+        ),
+        default=False,
     )
     # Number of bins in the shape distribution histogram
     bincnt = ceil(sqrt(_samplcnt))
@@ -83,10 +90,7 @@ class SelectSimilar(bpy.types.Operator):
     # Stores bgl handles for drawing the sample positions
     _gl_handls = []
     # Save a plot of every calculated shape distribution to disk?
-    save_plot: bpy.props.BoolProperty(
-        name="Save Plot",
-        default=False,
-    )
+    _save_plot = False
 
     def __del__(self):
         self._gl_handls.clear()
@@ -130,18 +134,18 @@ class SelectSimilar(bpy.types.Operator):
         points = sample_surf(ob.data, self._samplcnt)
 
         # Draw samples
-        tpoints = transf_vecs(ob.matrix_world, points)
-        drawer = View3DDrawer(draw_points)
-        self._gl_handls.append(drawer)
-        try:
-            drawer(tuple(tpoints))
-        except RuntimeError:
-            # Swallow it, it's just a visual cue after all.
-            pass
+        points = transf_vecs(ob.matrix_world, points)
+        if self.draw_sampls:
+            drawer = View3DDrawer(draw_points)
+            self._gl_handls.append(drawer)
+            try:
+                drawer(tuple(points))
+            except RuntimeError as e:
+                self.report({'WARNING'}, str(e))
 
         # Calc and plot shape distribution
         hist, bins = get_shape_distrib(points, self.bincnt)
-        if self.save_plot:
+        if self._save_plot:
             self._save_barplot(ob, bins, hist)
         return hist
 
@@ -177,8 +181,8 @@ class SelectSimilar(bpy.types.Operator):
             # those references become invalid on undo, which is
             # triggered every time this operator is re-executed with
             # different parameters
-            self.svals[o.name] = \
-                np.linalg.norm(odis - adis, ord=1) / self._samplcnt
+            self.svals[o.name] = np.linalg.norm(odis - adis, ord=1) \
+                / (self._samplcnt * 10.)
 
         if all_type_err:
             self.report({'ERROR_INVALID_INPUT'},
