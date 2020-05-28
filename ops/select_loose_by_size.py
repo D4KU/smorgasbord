@@ -16,12 +16,18 @@ from smorgasbord.thirdparty.redblack.redblack import TreeDict
 class SelectLooseBySize(bpy.types.Operator):
     bl_idname = "select.select_loose_by_size"
     bl_label = "Select Loose by Size"
-    bl_description = (
-        "Select loose parts of a mesh with a smaller bounding box "
-        "volume than a given threshold."
-    )
+    bl_description = "Select loose mesh parts in a given size range"
     bl_options = {'REGISTER', 'UNDO'}
     menus = [bpy.types.VIEW3D_MT_select_edit_mesh]
+
+    def _get_method(self):
+        return SelectLooseBySize._method
+
+    def _set_method(self, value):
+        cls = SelectLooseBySize
+        if cls._method != value:
+            cls._method = value
+            cls._dirty = True
 
     def _get_vol_limits(self):
         return SelectLooseBySize._vol_limits
@@ -35,11 +41,12 @@ class SelectLooseBySize(bpy.types.Operator):
     vol_limits: bpy.props.FloatVectorProperty(
         name="Bounding Volume Limits",
         description=(
-            "Loose parts whose bounding box's volume lies "
-            "between [min, max) get selected"
+            "Loose parts whose calculated comparison value lies "
+            "between [min, max), get selected. Calculations are "
+            "done in local space and units depend on the chosen "
+            "comparison method"
         ),
         size=2,
-        unit='VOLUME',
         step=10,
         default=_vol_limits,
         min=0.0,
@@ -47,50 +54,58 @@ class SelectLooseBySize(bpy.types.Operator):
         set=_set_vol_limits,
     )
 
+    _method = 0
+    _methods = (
+        ('DIAG', "Diagonal", "Compare the diagonal length of each "
+         "part's bounding box, in meters"),
+        ('VOL', "Volume", "Compare each part's bounding box volume, in "
+         "cubic meters")
+    )
+    method: bpy.props.EnumProperty(
+        name="Comparison Method",
+        description="Decides how a part's size is calculated",
+        items=_methods,
+        default=_methods[_method][0],
+        get=_get_method,
+        set=_set_method,
+    )
+    # True when method updated
+    _dirty = True
+
     # contains one list of loose parts per selected object
     _obs = []
     _resolution = 5
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and \
-            len(context.selected_editable_objects) > 0
-
-    def invoke(self, context, event):
-        if self._find_parts(context):
-            return self.execute(context)
-        else:
-            return {'CANCELLED'}
+        return context.mode == 'EDIT_MESH'
 
     def _find_parts(self, context):
         self._obs.clear()
-        all_type_err = True  # no obj is of type mesh
-
-        for o in context.selected_editable_objects:
-            if o.type != 'MESH':
-                continue
-            all_type_err = False
-            parts = TreeDict(acc=concat)
+        for o in context.objects_in_mode:
             data = o.data
+            parts = TreeDict(acc=concat)
             coords = get_vecs(data.vertices)
-            bverts = from_edit_mesh(data).verts
+            # choose comparison method
+            method = np.linalg.norm if self._method == 0 else np.prod
 
-            for indcs in get_parts(bverts):
+            for indcs in get_parts(from_edit_mesh(data).verts):
                 bounds, _ = get_bounds_and_center(coords[indcs])
-                # Calculate volume of bounding box round to create less
-                # bins in dict for better performance.
-                key = round(np.prod(bounds), self._resolution)
+                # calculate comparison value from bounding box,
+                # round to create less bins in dict for better
+                # performance
+                key = round(method(bounds), self._resolution)
                 parts[key] = indcs
 
             self._obs.append((data.vertices, parts))
 
-        if all_type_err:
-            self.report({'ERROR_INVALID_INPUT'},
-                        "An object must be of type mesh")
-            return False
-        return True
-
     def execute(self, context):
+        if self._dirty:
+            # Make sure to update the class property and not to
+            # create an eponymous parameter on this instance.
+            type(self)._dirty = False
+            self._find_parts(context)
+
         # the mesh doesn't update if we stay in edit mode
         bpy.ops.object.mode_set(mode='OBJECT')
         minv, maxv = self._vol_limits

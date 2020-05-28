@@ -1,5 +1,9 @@
 import bpy
+from math import pi
 from smorgasbord.common.decorate import register
+
+
+pihalf = pi * 0.5
 
 
 @register
@@ -11,23 +15,18 @@ class PrepareExportToUnity(bpy.types.Operator):
         "the Unity game engine. Destructive. Fails on linked data."
         )
     bl_options = {'REGISTER', 'UNDO'}
-    menus = [
-        bpy.types.VIEW3D_MT_transform_object,
-    ]
+    menus = [bpy.types.VIEW3D_MT_transform_object]
 
     prepare_orientation: bpy.props.BoolProperty(
         name="Prepare Orientation",
-        description=(
-            "Convert right-handed to left-handed coordinate "
-            "system"
-            ),
+        description=\
+            "Convert right-handed to left-handed coordinate system",
         default=True,
     )
-
     prepare_scale: bpy.props.BoolProperty(
         name="Prepare Scale",
         description="Convert object scale from cm to m",
-        default=True,
+        default=False,
     )
 
     @classmethod
@@ -40,15 +39,15 @@ class PrepareExportToUnity(bpy.types.Operator):
                 value=(-1, -1, 1),
                 center_override=(0, 0, 0),
             )
-            bpy.ops.transform.rotate(value=1.5708, orient_axis='X')
+            bpy.ops.transform.rotate(value=pihalf, orient_axis='X')
             bpy.ops.object.transform_apply(
                 location=False,
                 rotation=True,
-                scale=False,
+                scale=True,
                 )
-            bpy.ops.transform.rotate(value=-1.5708, orient_axis='X')
+            bpy.ops.transform.rotate(value=-pihalf, orient_axis='X')
 
-            # zero all bone rolls
+            # Subtract 180 deg from all bone rolls
             for o in context.selected_objects:
                 if o.type != 'ARMATURE':
                     continue
@@ -56,7 +55,7 @@ class PrepareExportToUnity(bpy.types.Operator):
                 bpy.ops.object.mode_set(
                     {'active_object': o}, mode='EDIT')
                 for b in o.data.edit_bones:
-                    b.roll = 0
+                    b.roll -= pi
                 bpy.ops.object.mode_set(mode='OBJECT')
 
         if self.prepare_scale:
