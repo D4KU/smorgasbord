@@ -1,7 +1,7 @@
 from smorgasbord.ops import (
     align_bounds,
     apply_name,
-    close_through_holes,
+    close_solid_holes,
     lerp_weight,
     material_transfer,
     prepare_export_to_unity,
