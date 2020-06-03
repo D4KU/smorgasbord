@@ -26,8 +26,9 @@ class SelectLooseBySize(bpy.types.Operator):
     def _set_method(self, value):
         cls = SelectLooseBySize
         if cls._method != value:
+            # Method changed, persistent data is outdated now
             cls._method = value
-            cls._dirty = True
+            cls._data.clear()
 
     def _get_vol_limits(self):
         return SelectLooseBySize._vol_limits
@@ -69,11 +70,15 @@ class SelectLooseBySize(bpy.types.Operator):
         get=_get_method,
         set=_set_method,
     )
-    # True when method updated
-    _dirty = True
 
-    # contains one list of loose parts per selected object
-    _obs = []
+    # Loose parts data to store between executions. List of tuples.
+    # First tuple entry is the reference to a mesh's vertex collection,
+    # second the mesh's list of loose parts, which in turn is a TreeDict
+    # with the vertex indices as values and the compare method's result
+    # for those indices as key.
+    _data = []
+    # Number of digits the compare method's result is rounded to in
+    # order to improve binning performance in the TreeDict.
     _resolution = 5
 
     @classmethod
@@ -81,7 +86,6 @@ class SelectLooseBySize(bpy.types.Operator):
         return context.mode == 'EDIT_MESH'
 
     def _find_parts(self, context):
-        self._obs.clear()
         for o in context.objects_in_mode:
             data = o.data
             parts = TreeDict(acc=concat)
@@ -97,20 +101,26 @@ class SelectLooseBySize(bpy.types.Operator):
                 key = round(method(bounds), self._resolution)
                 parts[key] = indcs
 
-            self._obs.append((data.vertices, parts))
+            self._data.append((data.vertices, parts))
+
+    def invoke(self, context, event):
+        # Without invoke(), executing this operation several times
+        # without changing parameters would make execute() use an
+        # outdated parts list on a modified mesh.
+        # However this breaks when this operator is called from script
+        # without passing 'INVOKE_DEFAULT' as execution context.
+        self._data.clear()
+        return self.execute(context)
 
     def execute(self, context):
-        if self._dirty:
-            # Make sure to update the class property and not to
-            # create an eponymous parameter on this instance.
-            type(self)._dirty = False
+        if not self._data:
             self._find_parts(context)
 
         # the mesh doesn't update if we stay in edit mode
         bpy.ops.object.mode_set(mode='OBJECT')
         minv, maxv = self._vol_limits
         try:
-            for verts, parts in self._obs:
+            for verts, parts in self._data:
                 # bool array of vertex indices storing whether
                 # the vert at that index needs to get selected
                 sel_flags = np.zeros(len(verts), dtype=bool)

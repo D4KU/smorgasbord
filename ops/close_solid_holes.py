@@ -8,6 +8,7 @@ from smorgasbord.common.io import (
     get_vecs,
 )
 from smorgasbord.common.decorate import register
+from smorgasbord.debug.visualize import patch_to_rnd_color
 
 
 @register
@@ -30,14 +31,14 @@ class CloseSolidHoles(bpy.types.Operator):
         CloseSolidHoles._limits = (min(value), value[1])
 
     # to prevent infinite recursion in getter and setter
-    _limits = (0, 1)
+    _limits = (0, 0.1)
     limits: bpy.props.FloatVectorProperty(
         name="Size Limits",
         description=(
             "Holes whose diameter lies between (min, max] get closed"
         ),
         size=2,
-        step=10,
+        step=1,
         default=_limits,
         min=0,
         get=_get_limits,
@@ -113,8 +114,8 @@ class CloseSolidHoles(bpy.types.Operator):
                         # other), but...
                         if flags[i2] and angl > -1e-3:
                             # at least two faces have to face each
-                            # other, allowing for some error margin.
-                            if angl > 1e-4:
+                            # other by a certain degree
+                            if angl > 0.1:
                                 concave = True
                             flags[i2] = False
                             stack.append(f2)
@@ -144,13 +145,12 @@ class CloseSolidHoles(bpy.types.Operator):
 
                 bounds, centr = get_bounds_and_center(centrs[findcs])
                 patches2.append((vindcs, centr, bounds[direc]))
+                # print((direc, round(bounds[direc], 3), vindcs))
             self._meshes.append((data, patches2))
 
     def execute(self, context):
         mind, maxd = self._limits
-        # Vertex indices already deleted in earlier patches that we
-        # can't delete again.
-        dvindcs = np.empty(0, dtype=int)
+        is_valid = np.vectorize(lambda x: x.is_valid)
 
         # Iterate over results computed during invoke()
         for mesh, patches in self._meshes:
@@ -161,15 +161,18 @@ class CloseSolidHoles(bpy.types.Operator):
                 if not mind < diam <= maxd:
                     continue
 
-                # Remove all vertices that already got deleted
-                vindcs = np.setdiff1d(vindcs, dvindcs)
-                # Merge all vertices of patch to first vertex in list
+                # Get vertices at indices
                 vs = bverts[vindcs]
+                # Filter out dead vertices already merged in previous
+                # patches
+                vs = vs[is_valid(vs)]
+                if len(vs) == 0:
+                    continue
+
+                # Merge all vertices of patch to first vertex in list
                 bm.ops.pointmerge(bob, verts=vs, merge_co=centr)
                 # Dissolve last remaining vertex of patch
                 bm.ops.dissolve_verts(bob, verts=[vs[0]])
-                del vs
-                dvindcs = np.concatenate((dvindcs, vindcs))
             bm.update_edit_mesh(mesh)
         return {'FINISHED'}
 
