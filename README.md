@@ -1,23 +1,43 @@
-This repository contains some functions (operators) for Blender that I wrote
-to make my life easier. I hope they do so for someone else as well.
+This repository contains various Blender operators to assist with the
+simplification, skinning, and material assignment of CAD-derived meshes. It is
+implemented in pure Python and therefore not always fast in handling
+high-polygonal meshes. It is also under development, so beware of bugs!
+
+1. [Installation](#installation-)  
+2. [Operators](#operators-)  
+2.1 [Replace by Primitive](#replace-by-primitive-)  
+2.2 [Align Bounds](#align-bounds-)  
+2.3 [Select Loose by Size](#select-loose-by-size-)  
+2.4 [Select Similar](#select-similar-)  
+2.5 [Transfer Materials](#transfer-materials-)  
+2.6 [Close Solid Holes](#close-solid-holes-)  
+2.7 [Lerp Weights](#lerp-weights-)  
+2.8 [Set Parent Advanced](#set-parent-advanced-)  
+2.9 [Apply Name](#apply-name-)  
+2.10 [Select All by Name](#select-all-byname-)  
+2.11 [Replace Duplicate Materials](#replace-duplicate-materials-)  
+2.12 [Prepare Export to Unity](#prepare-export-to-unity-)  
 
 
 # Installation
 
+Clone the repository to the *addons* directory in your script path with the
+command `git clone --recurse-submodules https://github.com/D4KU/smorgasboard`.
+You can type `bpy.utils.script_path_user()` into Blender's Python Console to
+find the path. The existence of submodules makes it unfortunately not possible
+to obtain the add-on as zip download.
+
 In Blender, navigate to `Edit > Preferences > Add-ons` and hit the *Install*
-button. If you downloaded this repository as a zip file, select that. If you
-cloned it, select the __init__.py file in the Add-ons' root directory. After
-you hit *Install Add-on*, make sure to tick the Add-on in the list and save
-your preferences. Enjoy!
+button. Navigate to the cloned folder and select the *__init__.py* file. Make
+sure to also tick the add-on in the list and save your preferences. Enjoy!
 
 
-# Content
+# Operators
 
 ### Replace by Primitive
 
-In Object Mode: `Object > Transform > Replace by Primitive`
-
-In Edit Mode: `Mesh > Transform > Replace by Primitive`
+`[Object mode] Object > Transform > Replace by Primitive`  
+`[Edit mode] Mesh > Transform > Replace by Primitive`
 
 Replace selected objects or vertices by a chosen geometric primitive. This
 primitive is transformed so its bounding box fits the bounding box of the
@@ -32,9 +52,8 @@ directly to the mesh data.
 
 ### Align Bounds
 
-In Object Mode: `Object > Transform > Align Bounds`
-
-In Edit Mode: `Mesh > Transform > Align Bounds`
+`[Object mode] Object > Transform > Align Bounds`  
+`[Edit mode] Mesh > Transform > Align Bounds`
 
 In Object mode, align any number of selected objects to the active one. As in
 the `Replace by Primitive` function, only the object's bounding boxes are
@@ -53,16 +72,58 @@ Blender function.
 
 ### Select Loose by Size
 
-In Edit Mode: `Select > Select Loose by Size` 
+`[Edit mode] Select > Select Loose by Size` 
 
-Select loose parts in the currently edited meshes whose bounding box volume is
-greater than a given minimum threshold and less or equal than a given maximum
-threshold.
+Select loose parts in the currently edited meshes whose bounding box volume
+(or diagonal) is greater than a given minimum threshold and less or equal than
+a given maximum threshold.
 
 
-### Set Parent Advanced 
+### Select Similar
 
-`Object > Parent > Set Parent Advanced`
+`[Object mode] Select > Select Similar`
+
+This in an implementation of Osada et al.'s paper *Matching 3D Models with
+Shape Distributions*. By selecting an object and choosing similarity measure
+limits, one can find objects with a similar shape in the scene. The method is
+scale- and rotation-invariant, but it is pretty simple, without any usage of
+Machine Learning, so similarities between deformed or complex objects can't be
+reliably detected.
+
+
+### Transfer Materials
+
+`[Object mode] Object > Relations > Transfer materials`
+
+This operator only exists to compensate the fact that the Data Transfer
+modifier can't transfer material slots. In every selected target mesh, it
+finds the closest polygon in the active source mesh and copies over the
+assigned material.
+
+
+### Close Solid Holes
+
+`[Edit mode] Transform > Close Solid Holes`
+
+A solid hole is not invalid geometry caused by missing polygons, but concave
+geometry building a loop. Think of the holes you find in cheese. This operator
+tries to close those. However, currently the algorithm is not sophisticated
+enough to reliably work on complicated meshes. It basically takes every
+concave part of a mesh for a hole, which is obviously incorrect.
+
+
+### Lerp Weights
+
+`[Weight Paint mode] Weights > Lerp Weights`
+
+By selecting two bones in an armature and vertices in a mesh, this operator is
+able to linearly interpolate the bones' weights based on the distance between
+them.
+
+
+### Set Parent Advanced
+
+`[Object mode] Object > Parent > Set Parent Advanced`
 
 Adds more options to parent one object to another:
 
@@ -79,7 +140,7 @@ child's world position before re-parenting becomes its new origin.
 
 ### Apply Name
 
-`Object > Apply > Apply Name`
+`[Object mode] Object > Apply > Apply Name`
 
 Set the name of an selected object's data block equal to the object name. If
 several objects link to the same data block, its name is set to the one of the
@@ -88,7 +149,7 @@ last linked object in the scene hierarchy.
 
 ### Select All by Name
 
-`Select > Select All by Name`
+`[Object mode] Select > Select All by Name`
 
 Select all objects in the scene whose name either contains, equals, starts
 with, or ends with a given phrase.
@@ -109,7 +170,7 @@ material without such a suffix, if such a material exists. For example,
 
 ### Prepare Export to Unity
 
-`Object > Transform > Prepare Export to Unity`
+`[Object mode] Object > Transform > Prepare Export to Unity`
 
 A crude script that applies a rotation and scaling to every selected object to
 transform the coordinate system and units used in Blender to those used in the

@@ -2,7 +2,7 @@ import bpy
 import numpy as np
 
 
-def patch_to_rnd_color(data, patches, matname="patch")
+def patch_to_rnd_color(data, patches, matname="patch"):
     mats = data.materials
     polys = data.polygons
 
