@@ -21,15 +21,16 @@ high-polygonal meshes. It is also under development, so beware of bugs!
 
 # Installation
 
-Clone the repository to the *addons* directory in your script path with the
+Clone the repository to the **addons** directory in your script path with the
 command `git clone --recurse-submodules https://github.com/D4KU/smorgasboard`.
 You can type `bpy.utils.script_path_user()` into Blender's Python Console to
 find the path. The existence of submodules makes it unfortunately not possible
 to obtain the add-on as zip download.
 
-In Blender, navigate to `Edit > Preferences > Add-ons` and hit the *Install*
-button. Navigate to the cloned folder and select the *__init__.py* file. Make
-sure to also tick the add-on in the list and save your preferences. Enjoy!
+In Blender, navigate to `Edit > Preferences > Add-ons` and hit the **Install**
+button. Navigate to the cloned folder and select the *\_\_init__.py* file.
+Make sure to also tick the add-on in the list and save your preferences.
+Enjoy!
 
 
 # Operators
@@ -78,6 +79,7 @@ Select loose parts in the currently edited meshes whose bounding box volume
 (or diagonal) is greater than a given minimum threshold and less or equal than
 a given maximum threshold.
 
+![](https://github.com/D4KU/smorgasbord/blob/master/media/SelectLooseBySize.gif)
 
 ### Select Similar
 
@@ -87,8 +89,8 @@ This in an implementation of Osada et al.'s paper *Matching 3D Models with
 Shape Distributions*. By selecting an object and choosing similarity measure
 limits, one can find objects with a similar shape in the scene. The method is
 scale- and rotation-invariant, but it is pretty simple, without any usage of
-Machine Learning, so similarities between deformed or complex objects can't be
-reliably detected.
+Machine Learning, so similarities between strongly deformed or complex objects
+can't be reliably detected.
 
 
 ### Transfer Materials
@@ -119,6 +121,8 @@ concave part of a mesh for a hole, which is obviously incorrect.
 By selecting two bones in an armature and vertices in a mesh, this operator is
 able to linearly interpolate the bones' weights based on the distance between
 them.
+
+![](https://github.com/D4KU/smorgasbord/blob/master/media/LerpWeights.gif)
 
 
 ### Set Parent Advanced
