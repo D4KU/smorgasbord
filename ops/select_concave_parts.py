@@ -1,5 +1,6 @@
 import bmesh as bm
 import bpy
+from math import pi
 import numpy as np
 
 from smorgasbord.common.io import (
@@ -7,42 +8,64 @@ from smorgasbord.common.io import (
     get_scalars,
     get_vecs,
 )
+from smorgasbord.common.transf import normalize
 from smorgasbord.common.decorate import register
-from smorgasbord.debug.visualize import patch_to_rnd_color
+
+
+pihalf = pi * 0.5
+
+
+def _select(x):
+    x.select = True
+_selall = np.vectorize(_select)
+
+
+def _deselect(x):
+    x.select = False
+_deselall = np.vectorize(_deselect)
 
 
 @register
-class CloseSolidHoles(bpy.types.Operator):
-    bl_idname = "object.close_solid_holes"
-    bl_label = "Close Solid Holes"
-    bl_description = (
-        "Close through-going or blind holes in the selected geometry. "
-        "These are aren't holes caused by missing faces, but valid "
-        "geometry. Think of holes in a cheese."
-    )
+class SelectConcaveParts(bpy.types.Operator):
+    bl_idname = "object.select_concave"
+    bl_label = "Select Concave Parts"
+    bl_description = "Select concave patches of a mesh"
     bl_options = {'REGISTER', 'UNDO'}
-    menus = [bpy.types.VIEW3D_MT_transform]
+    menus = [bpy.types.VIEW3D_MT_select_edit_mesh]
 
     def _get_limits(self):
-        return CloseSolidHoles._limits
+        return SelectConcaveParts._limits
 
     def _set_limits(self, value):
         # clamp min to max
-        CloseSolidHoles._limits = (min(value), value[1])
+        SelectConcaveParts._limits = (min(value), value[1])
 
     # to prevent infinite recursion in getter and setter
     _limits = (0, 0.1)
     limits: bpy.props.FloatVectorProperty(
         name="Size Limits",
         description=(
-            "Holes whose diameter lies between (min, max] get closed"
+            "Only select patches whose bounding box's diameter lies "
+            "between (min, max]"
         ),
         size=2,
-        step=1,
+        step=0.1,
         default=_limits,
+        unit='LENGTH',
         min=0,
         get=_get_limits,
         set=_set_limits,
+    )
+    minangl: bpy.props.FloatProperty(
+        name="Min Angle",
+        description=(
+            "Only select patches containing a face angled to its "
+            "neighbor by at least this angle"
+        ),
+        subtype='ANGLE',
+        default=0.1,
+        min=0,
+        max=pihalf,
     )
     _meshes = []
 
@@ -73,12 +96,12 @@ class CloseSolidHoles(bpy.types.Operator):
             # bmesh has to recalculate face centers, so get them
             # directly from the mesh data instead
             centrs = get_vecs(polys, attr='center')
-            # Bool array of vertex indices already visited
-            # Unselected faces will be True already
+            # Bool array of vertex indices already visited.
+            # Unselected faces will be True already.
             flags = get_scalars(polys)
             # Will contain a list of tuples. First entry is the list of
-            # face indices of the patch. Second is the dimension it's
-            # facing.
+            # face indices of the patch. Second is the maximum angle
+            # between two neighboring faces in the patch.
             # This list is only needed to not delete vertices while we
             # iterate the mesh.
             patches = []
@@ -92,7 +115,9 @@ class CloseSolidHoles(bpy.types.Operator):
                 stack = [bfaces[i]]
                 # Face indices of the patch
                 findcs = []
-                concave = False
+                # Maximum dot product between two neighboring faces in
+                # the patch.
+                maxdot = 0
 
                 while stack:
                     f = stack.pop()
@@ -108,71 +133,44 @@ class CloseSolidHoles(bpy.types.Operator):
                         # vector between both face's centers is a
                         # simple way to measure if they are parallel
                         # (=0), concave (>0), or convex (<0).
-                        angl = n.dot(centrs[i2] - c)
+                        angl = n.dot(normalize(centrs[i2] - c))
                         # but only if not already checked and f and f2
                         # are not convex (don't face away from each 
-                        # other), but...
+                        # other)
                         if flags[i2] and angl > -1e-3:
-                            # at least two faces have to face each
-                            # other by a certain degree
-                            if angl > 0.1:
-                                concave = True
+                            maxdot = max(maxdot, angl)
                             flags[i2] = False
                             stack.append(f2)
 
-                if len(findcs) > 2 and concave:
-                    patches.append(findcs)
+                if len(findcs) > 2:
+                    # pihalf: transform dot product result to rad angle
+                    patches.append((findcs, maxdot * pihalf))
 
             del flags
             # second representation of patches, this time as a tuple of
-            # vertex indices, center, and diameter
+            # face indices, max angle, and diameter
             patches2 = []
             normals = get_vecs(polys, attr='normal')
 
-            for findcs in patches:
-                # get verts of faces in patch
-                vindcs = []
-                for fidx in findcs:
-                    vindcs += list(polys[fidx].vertices)
-                # remove duplicate elements
-                vindcs = list(set(vindcs))
-
-                # for every face in the patch, get the dimension it's
-                # facing most (x = 0, y = 1, z = 2)
-                dirs = np.argmax(np.abs(normals[findcs]), axis=1)
-                # get the direction most of the faces face
-                direc = dirs[np.bincount(dirs).argmax()]
-
-                bounds, centr = get_bounds_and_center(centrs[findcs])
-                patches2.append((vindcs, centr, bounds[direc]))
-                # print((direc, round(bounds[direc], 3), vindcs))
+            for findcs, maxangl in patches:
+                bounds, _ = get_bounds_and_center(centrs[findcs])
+                patches2.append((findcs, maxangl, np.linalg.norm(bounds)))
             self._meshes.append((data, patches2))
 
     def execute(self, context):
         mind, maxd = self._limits
-        is_valid = np.vectorize(lambda x: x.is_valid)
 
         # Iterate over results computed during invoke()
         for mesh, patches in self._meshes:
             bob = bm.from_edit_mesh(mesh)
-            bverts = np.array(bob.verts)
-            for vindcs, centr, diam in patches:
-                # Only close holes whose diameter lies within limits
-                if not mind < diam <= maxd:
-                    continue
-
-                # Get vertices at indices
-                vs = bverts[vindcs]
-                # Filter out dead vertices already merged in previous
-                # patches
-                vs = vs[is_valid(vs)]
-                if len(vs) == 0:
-                    continue
-
-                # Merge all vertices of patch to first vertex in list
-                bm.ops.pointmerge(bob, verts=vs, merge_co=centr)
-                # Dissolve last remaining vertex of patch
-                bm.ops.dissolve_verts(bob, verts=[vs[0]])
+            bfaces = np.array(bob.faces)
+            _deselall(bfaces)
+            for findcs, maxangl, diam in patches:
+                # Only select patches whose diameter lies within limits
+                # and biggest angle between two neighboring faces is
+                # big enough
+                if mind < diam <= maxd and maxangl > self.minangl:
+                    _selall(bfaces[findcs])
             bm.update_edit_mesh(mesh)
         return {'FINISHED'}
 
