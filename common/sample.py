@@ -5,16 +5,21 @@ import numpy as np
 from smorgasbord.common.io import get_scalars, get_vecs
 
 
-def sample_surf(mesh, samplecnt=1024):
+def sample_mesh(mesh, samplecnt=1024, mask=None):
     """
     Draw N random samples on the surface of a triangle mesh.
 
     Parameters
     ----------
     mesh : bpy.types.Mesh
-        Blender triangle mesh to sample from.
+        Blender mesh to sample from.
     samplecnt : int = 1024
-        Number of samples to draw.
+        Number of samples to use.
+    mask : Iterable or None = None
+        Iterable specifying the faces from which to sample either by
+        passing their index in the mesh's face list as an Integer
+        iterable or as a Bool iterable where that specific index is set
+        to True. If None is passed, every face is sampled.
 
     Returns
     -------
@@ -25,6 +30,13 @@ def sample_surf(mesh, samplecnt=1024):
     # Load mesh into bmesh,
     bob = bm.new()
     bob.from_mesh(mesh, face_normals=False)
+    if mask is not None:
+        bfaces = np.array(bob.faces)
+        invmask = np.ones(len(bfaces), dtype=np.bool)
+        invmask[mask] = False
+        bm.ops.delete(bob, geom=bfaces[invmask], context='FACES')
+        del bfaces, invmask
+
     # triangulate it,
     bm.ops.triangulate(bob, faces=bob.faces)
     # and save it back to a temporary mesh, so that we can use

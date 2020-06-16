@@ -6,7 +6,7 @@ from smorgasbord.common.io import get_bounds_and_center
 from smorgasbord.common.transf import transf_vecs
 from smorgasbord.common.decorate import register
 from smorgasbord.common.draw import draw_points, View3DDrawer
-from smorgasbord.common.sample import sample_surf, get_shape_distrib
+from smorgasbord.common.sample import sample_mesh, get_shape_distrib
 # from smorgasbord.debug.plot import save_barplot
 
 
@@ -89,8 +89,6 @@ class SelectSimilar(bpy.types.Operator):
     _resampl = True
     # Stores bgl handles for drawing the sample positions
     _gl_handls = []
-    # Save a plot of every calculated shape distribution to disk?
-    _save_plot = False
 
     def __del__(self):
         self._gl_handls.clear()
@@ -131,7 +129,7 @@ class SelectSimilar(bpy.types.Operator):
         return the object's shape distribution, and optionally save it
         as a plot to disk.
         """
-        points = sample_surf(ob.data, self._samplcnt)
+        points = sample_mesh(ob.data, self._samplcnt)
 
         # Draw samples
         points = transf_vecs(ob.matrix_world, points)
@@ -145,8 +143,7 @@ class SelectSimilar(bpy.types.Operator):
 
         # Calc and plot shape distribution
         hist, bins = get_shape_distrib(points, self.bincnt)
-        if self._save_plot:
-            self._save_barplot(ob, bins, hist)
+        # self._save_barplot(ob, bins, hist)
         return hist
 
     def _comp_shape_distribs(self, context):
