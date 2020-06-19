@@ -3,20 +3,20 @@ simplification, skinning, and material assignment of CAD-derived meshes. It is
 implemented in pure Python and therefore not always fast in handling
 high-polygonal meshes. It is also under development, so beware of bugs!
 
-1. [Installation](#installation-)  
-2. [Operators](#operators-)  
-2.1 [Replace by Primitive](#replace-by-primitive-)  
-2.2 [Align Bounds](#align-bounds-)  
-2.3 [Select Loose by Size](#select-loose-by-size-)  
-2.4 [Select Similar](#select-similar-)  
-2.5 [Transfer Materials](#transfer-materials-)  
-2.6 [Close Solid Holes](#close-solid-holes-)  
-2.7 [Lerp Weights](#lerp-weights-)  
-2.8 [Set Parent Advanced](#set-parent-advanced-)  
-2.9 [Apply Name](#apply-name-)  
-2.10 [Select All by Name](#select-all-byname-)  
-2.11 [Replace Duplicate Materials](#replace-duplicate-materials-)  
-2.12 [Prepare Export to Unity](#prepare-export-to-unity-)  
+1. [Installation](#installation)
+2. [Operators](#operators)  
+2.1 [Replace by Primitive](#replace-by-primitive)  
+2.2 [Align Bounds](#align-bounds)  
+2.3 [Select Loose by Size](#select-loose-by-size)  
+2.4 [Select Similar](#select-similar)  
+2.5 [Transfer Materials](#transfer-materials)  
+2.6 [Select Concave Parts](#select-concave-partsselect-concave-parts)  
+2.7 [Lerp Weights](#lerp-weights)  
+2.8 [Set Parent Advanced](#set-parent-advanced)  
+2.9 [Apply Name](#apply-name)  
+2.10 [Select All by Name](#select-all-byname)  
+2.11 [Replace Duplicate Materials](#replace-duplicate-materials)  
+2.12 [Prepare Export to Unity](#prepare-export-to-unity)  
 
 
 # Installation
@@ -85,7 +85,7 @@ a given maximum threshold.
 
 `[Object mode] Select > Select Similar`
 
-This in an implementation of Osada et al.'s paper *Matching 3D Models with
+This in an implementation of *Osada et al.'s* paper *Matching 3D Models with
 Shape Distributions*. By selecting an object and choosing similarity measure
 limits, one can find objects with a similar shape in the scene. The method is
 scale- and rotation-invariant, but it is pretty simple, without any usage of
@@ -102,16 +102,20 @@ modifier can't transfer material slots. In every selected target mesh, it
 finds the closest polygon in the active source mesh and copies over the
 assigned material.
 
+![](https://github.com/D4KU/smorgasbord/blob/master/media/TransferMaterials.gif)
 
-### Close Solid Holes
 
-`[Edit mode] Transform > Close Solid Holes`
+### Select Concave Parts
 
-A solid hole is not invalid geometry caused by missing polygons, but concave
-geometry building a loop. Think of the holes you find in cheese. This operator
-tries to close those. However, currently the algorithm is not sophisticated
-enough to reliably work on complicated meshes. It basically takes every
-concave part of a mesh for a hole, which is obviously incorrect.
+`[Edit mode] Select > Select Concave Parts`
+
+By comparing normals of adjacent faces, this operator is able to select
+concave mesh parts. It defines a concave patch as a set of connected polygons
+in which at least two polygons face each other by a given angle. The border to
+neighboring patches is set along edges whose adjacent polygons face away from
+each other.
+
+![](https://github.com/D4KU/smorgasbord/blob/master/media/SelectConcaveParts.gif)
 
 
 ### Lerp Weights
