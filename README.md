@@ -1,3 +1,5 @@
+[![Buy me a coffee](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/d4ku)
+
 This repository contains various Blender operators to assist with the
 simplification, skinning, and material assignment of CAD-derived meshes. It is
 implemented in pure Python and therefore not always fast in handling
@@ -91,6 +93,8 @@ limits, one can find objects with a similar shape in the scene. The method is
 scale- and rotation-invariant, but it is pretty simple, without any usage of
 Machine Learning, so similarities between strongly deformed or complex objects
 can't be reliably detected.
+
+![](https://github.com/D4KU/smorgasbord/blob/master/media/SelectSimilar.gif)
 
 
 ### Transfer Materials
