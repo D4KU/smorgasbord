@@ -20,8 +20,31 @@ class PrepareExportToUnity(bpy.types.Operator):
     prepare_orientation: bpy.props.BoolProperty(
         name="Prepare Orientation",
         description=\
-            "Convert right-handed to left-handed coordinate system",
+            "Rotate selection 90 degrees around x-axis",
         default=True,
+    )
+    inv_rot: bpy.props.BoolProperty(
+        name="Inverse Rotation",
+        description=\
+            "Rotate selection -90 degrees instead. Only takes effect "
+            "if 'Prepare Orientation' is true",
+        default=False,
+    )
+    correct_bone_roll: bpy.props.BoolProperty(
+        name="Correct Bone Roll",
+        description=\
+            "Iterate over every selected armature and subtract 90 "
+            "degrees from every bone's roll angle. Only takes effect "
+            "if 'Prepare Orientation' is true",
+        default=False,
+    )
+    swap_left_right: bpy.props.BoolProperty(
+        name="Swap Left Right",
+        description=\
+            "Swap left and right to fully convert the right-handed to "
+            "a left-handed coordinate system. Only takes effect if "
+            "'Prepare Orientation' is true",
+        default=False,
     )
     prepare_scale: bpy.props.BoolProperty(
         name="Prepare Scale",
@@ -35,28 +58,32 @@ class PrepareExportToUnity(bpy.types.Operator):
 
     def execute(self, context):
         if self.prepare_orientation:
-            bpy.ops.transform.resize(
-                value=(-1, -1, 1),
-                center_override=(0, 0, 0),
-            )
-            bpy.ops.transform.rotate(value=pihalf, orient_axis='X')
+            if self.swap_left_right:
+                bpy.ops.transform.resize(
+                    value=(-1, -1, 1),
+                    center_override=(0, 0, 0),
+                )
+
+            angl = -pihalf if self.inv_rot else pihalf
+            bpy.ops.transform.rotate(value=angl, orient_axis='X')
             bpy.ops.object.transform_apply(
                 location=False,
                 rotation=True,
-                scale=True,
+                scale=self.swap_left_right,
                 )
-            bpy.ops.transform.rotate(value=-pihalf, orient_axis='X')
+            bpy.ops.transform.rotate(value=-angl, orient_axis='X')
 
-            # Subtract 180 deg from all bone rolls
-            for o in context.selected_objects:
-                if o.type != 'ARMATURE':
-                    continue
+            if self.correct_bone_roll:
+                for o in context.selected_objects:
+                    if o.type != 'ARMATURE':
+                        continue
 
-                bpy.ops.object.mode_set(
-                    {'active_object': o}, mode='EDIT')
-                for b in o.data.edit_bones:
-                    b.roll -= pi
-                bpy.ops.object.mode_set(mode='OBJECT')
+                    bpy.ops.object.mode_set(
+                        {'active_object': o}, mode='EDIT')
+                    for b in o.data.edit_bones:
+                        # TODO test if 2*angl is actually necessary
+                        b.roll -= angl
+                    bpy.ops.object.mode_set(mode='OBJECT')
 
         if self.prepare_scale:
             bpy.ops.transform.resize(value=(100, 100, 100))
