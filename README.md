@@ -25,7 +25,7 @@ high-polygonal meshes. It is also under development, so beware of bugs!
 
 Clone the repository to the **addons** directory in your script path with the
 command `git clone --recurse-submodules
-https://github.com/D4KU/smorgasboard.git`.  You can type
+https://github.com/D4KU/smorgasbord.git`.  You can type
 `bpy.utils.script_path_user()` into Blender's Python Console to find the path.
 The existence of submodules makes it unfortunately not possible to obtain the
 add-on as zip download.
