@@ -73,25 +73,42 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
             if not self.merge_slots:
                 continue  # next object
 
-            # Can't use o.data.materials.values() for comparison
-            # because of empty slots not having a material
-            slotnames = o.material_slots.keys()
-            for i, slot in enumerate(o.material_slots):
-                # Find index of first key list entry with name same
-                first = slotnames.index(slot.name)
-                if first >= i:
-                    continue  # next slot
-
-                # If an eponymous slot before the current index is
-                # found, merge the current slot with the found one by
-                # moving the former below the latter and ...
-                o.active_material_index = i
-                for _ in range(i - first - 1):
-                    bpy.ops.object.material_slot_move()
-                # removing the current slot
-                bpy.ops.object.material_slot_remove()
+            # To my knowledge the only way to merge material slots is to
+            # call the UI functions from bpy.ops. Because slot indices
+            # change during iteration due to removal, only one duplicate
+            # is removed before the process is restarted. This is slow,
+            # but safe.
+            while merge_first_equal_slots(o):
+                pass
 
         return {'FINISHED'}
+
+
+def merge_first_equal_slots(ob):
+    """
+    For a given object, merges the first two eponymous material slots.
+    Returns True if there might be more slots to merge and False if all
+    are distinct.
+    """
+    # Can't use o.data.materials.values() for comparison
+    # because of empty slots not having a material
+    slotnames = ob.material_slots.keys()
+    for i, name in enumerate(slotnames):
+        # Find index of first key list entry with name same
+        first = slotnames.index(name)
+        if first >= i:
+            continue  # next slot
+
+        # If an eponymous slot before the current index is
+        # found, merge the current slot with the found one by
+        # moving the current below the found and ...
+        ob.active_material_index = i
+        for _ in range(i - first - 1):
+            bpy.ops.object.material_slot_move()
+        # ... removing the current
+        bpy.ops.object.material_slot_remove()
+        return True
+    return False
 
 
 if __name__ == "__main__":
