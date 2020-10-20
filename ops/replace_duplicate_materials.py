@@ -80,6 +80,7 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
             # is removed before the process is restarted. This is slow,
             # but safe.
             context.view_layer.objects.active = o
+            context.view_layer.update()
             while merge_first_equal_slots(o):
                 pass
 
