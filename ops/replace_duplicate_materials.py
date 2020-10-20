@@ -45,6 +45,7 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
         return len(context.selected_objects) > 0
 
     def execute(self, context):
+        old_active = context.view_layer.objects.active
         cmats = bpy.data.materials
         pat = re.compile(self.pattern)
         for o in context.selected_objects:
@@ -78,9 +79,11 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
             # change during iteration due to removal, only one duplicate
             # is removed before the process is restarted. This is slow,
             # but safe.
+            context.view_layer.objects.active = o
             while merge_first_equal_slots(o):
                 pass
 
+        context.view_layer.objects.active = old_active
         return {'FINISHED'}
 
 

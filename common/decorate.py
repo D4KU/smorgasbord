@@ -26,20 +26,12 @@ def register(cls):
         for m in cls.menus:
             m.append(draw_menu)
 
-    def unregster():
-        bpy.utils.register_class(cls)
+    def unregister():
+        bpy.utils.unregister_class(cls)
         for m in cls.menus:
             m.remove(draw_menu)
 
-    setattr(sys.modules[cls.__module__], 'register', register)
+    modl = sys.modules[cls.__module__]
+    setattr(modl, 'register', register)
+    setattr(modl, 'unregister', unregister)
     return cls
-
-
-# def pass_to(recipient):
-#     def decorator(decoratee):
-#         def wrap(*args, **kwargs):
-#             ret = decoratee(*args, **kwargs)
-#             recipient(ret)
-#             return ret
-#         return wrap
-#     return decorator

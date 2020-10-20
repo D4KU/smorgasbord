@@ -43,6 +43,7 @@ class PrepareExportToUnity(bpy.types.Operator):
         # it is not transformed several times. 'None' keeps Empty
         # objects away.
         datas = {None}
+        arms = []
         for o in context.selected_editable_objects:
             data = o.data
             if data not in datas:
@@ -51,15 +52,7 @@ class PrepareExportToUnity(bpy.types.Operator):
                 data.transform(t_pre)
                 datas.add(data)
                 if o.type == 'ARMATURE':
-                    # After transforming an armature's data with
-                    # 't_pre', every bone gets an additional roll of 180
-                    # degrees. To remove that, the armature has to be
-                    # set to edit mode.
-                    bpy.ops.object.mode_set(
-                        {'active_object': o}, mode='EDIT')
-                    for b in o.data.edit_bones:
-                        b.roll -= pi
-                    bpy.ops.object.mode_set(mode='OBJECT')
+                    arms.append(o)
             # Set every root object's location and add a rotation of 90
             # degrees around the x axis. This rotation is subtracted on
             # import into Unity. God knows why.
@@ -69,6 +62,22 @@ class PrepareExportToUnity(bpy.types.Operator):
             if not o.parent:
                 o.matrix_world = t_post @ o.matrix_world @ t_pre
 
+        # After transforming an armature's data with 't_pre', every bone
+        # gets an additional roll of 180 degrees. To remove that, any
+        # armature has to be set to edit mode.
+        if arms:
+            # Context override would be faster, but doesn't update the
+            # object until clicked
+            old_active = context.view_layer.objects.active
+            context.view_layer.objects.active = arms[0]
+            bpy.ops.object.mode_set_with_submode(mode='EDIT')
+
+            for o in arms:
+                for b in o.data.edit_bones:
+                    b.roll -= pi
+
+            bpy.ops.object.mode_set(mode='OBJECT')
+            context.view_layer.objects.active = old_active
         return {'FINISHED'}
 
 
