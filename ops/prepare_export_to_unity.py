@@ -2,6 +2,7 @@ import bpy
 from mathutils import Matrix
 from math import pi
 from smorgasbord.common.decorate import register
+from smorgasbord.common.io import get_lvl
 
 
 # Swap Y with Z and invert X to transform a right-handed Z-up
@@ -21,6 +22,11 @@ t_post = Matrix(((-1,  0, 0, 0),
                  ( 0,  0, 1, 0),
                  ( 0,  0, 0, 1)))
 
+# Transformation to apply to pose bones (which are Y-up).
+t_pose = Matrix(((-1, 0,  0, 0),
+                 (0, 1,  0, 0),
+                 (0, 0, -1, 0),
+                 (0, 0,  0, 1)))
 
 @register
 class PrepareExportToUnity(bpy.types.Operator):
@@ -44,7 +50,10 @@ class PrepareExportToUnity(bpy.types.Operator):
         # objects away.
         datas = {None}
         arms = []
-        for o in context.selected_editable_objects:
+        # Iterate over selected objects from scene root to deepest
+        # children
+        obs = sorted(context.selected_editable_objects, key=get_lvl)
+        for o in obs:
             data = o.data
             if data not in datas:
                 # Transforms the object's data so that the object does
@@ -52,15 +61,14 @@ class PrepareExportToUnity(bpy.types.Operator):
                 data.transform(t_pre)
                 datas.add(data)
                 if o.type == 'ARMATURE':
+                    # Transform pose bones
+                    for b in o.pose.bones:
+                        b.matrix_basis = t_pose @ b.matrix_basis @ t_pose
                     arms.append(o)
-            # Set every root object's location and add a rotation of 90
+            # Set every object's location and add a rotation of 90
             # degrees around the x axis. This rotation is subtracted on
             # import into Unity. God knows why.
-            # Since this is only done for objects without parents, it
-            # might lead to unexpected behaviour when those root objects
-            # are not prepared and exported.
-            if not o.parent:
-                o.matrix_world = t_post @ o.matrix_world @ t_pre
+            o.matrix_world = t_post @ o.matrix_world @ t_pre
 
         # After transforming an armature's data with 't_pre', every bone
         # gets an additional roll of 180 degrees. To remove that, any
