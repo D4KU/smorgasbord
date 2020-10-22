@@ -16,6 +16,7 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
     )
     bl_options = {'REGISTER', 'UNDO'}
     menus = [bpy.types.MATERIAL_MT_context_menu]
+    _bug_unreported = True
 
     pattern: bpy.props.StringProperty(
         name='Regex pattern',
@@ -80,39 +81,49 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
             # is removed before the process is restarted. This is slow,
             # but safe.
             context.view_layer.objects.active = o
-            context.view_layer.update()
-            while merge_first_equal_slots(o):
+            while self.merge_first_equal_slots(o):
                 pass
 
         context.view_layer.objects.active = old_active
         return {'FINISHED'}
 
+    def merge_first_equal_slots(self, ob):
+        """
+        For a given object, merges the first two eponymous material slots.
+        Returns True if there might be more slots to merge and False if all
+        are distinct.
+        """
+        # Can't use o.data.materials.values() for comparison
+        # because of empty slots not having a material
+        slotnames = ob.material_slots.keys()
+        for i, name in enumerate(slotnames):
+            # Find index of first key list entry with name same
+            first = slotnames.index(name)
+            if first >= i:
+                continue  # next slot
 
-def merge_first_equal_slots(ob):
-    """
-    For a given object, merges the first two eponymous material slots.
-    Returns True if there might be more slots to merge and False if all
-    are distinct.
-    """
-    # Can't use o.data.materials.values() for comparison
-    # because of empty slots not having a material
-    slotnames = ob.material_slots.keys()
-    for i, name in enumerate(slotnames):
-        # Find index of first key list entry with name same
-        first = slotnames.index(name)
-        if first >= i:
-            continue  # next slot
+            # If an eponymous slot before the current index is
+            # found, merge the current slot with the found one by
+            # moving the current below the found and ...
+            ob.active_material_index = i
+            for _ in range(i - first - 1):
+                bpy.ops.object.material_slot_move()
+            # ... removing the current
+            bpy.ops.object.material_slot_remove()
 
-        # If an eponymous slot before the current index is
-        # found, merge the current slot with the found one by
-        # moving the current below the found and ...
-        ob.active_material_index = i
-        for _ in range(i - first - 1):
-            bpy.ops.object.material_slot_move()
-        # ... removing the current
-        bpy.ops.object.material_slot_remove()
-        return True
-    return False
+            # Somehow material_slot_remove does not work on
+            # non-active objects when it is executed from outside the
+            # 3D view, even though its poll method returns True.
+            if len(slotnames) == len(ob.material_slots.keys()) \
+                    and self._bug_unreported:
+                self._bug_unreported = False
+                self.report({'ERROR'},
+                    ("Could only merge material slots on the active "
+                     "object. Try executing from the 3D View."))
+                return False
+
+            return True
+        return False
 
 
 if __name__ == "__main__":

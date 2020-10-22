@@ -4,6 +4,7 @@ from smorgasbord.ops import (
     lerp_weight,
     material_transfer,
     prepare_export_to_unity,
+    remove_empty_vertex_groups,
     replace_by_primitive,
     replace_duplicate_materials,
     select_by_name,
