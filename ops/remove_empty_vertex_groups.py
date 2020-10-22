@@ -35,6 +35,9 @@ class RemoveEmptyVertexGroups(bpy.types.Operator):
 
     def execute(self, context):
         for o in context.selected_objects:
+            if o.type != 'MESH':
+                continue
+
             vgs = o.vertex_groups
             # Bool array storing True at each vertex group's index which
             # is going to be removed
