@@ -22,7 +22,8 @@ t_post = Matrix(((-1,  0, 0, 0),
                  ( 0,  0, 1, 0),
                  ( 0,  0, 0, 1)))
 
-# Transformation to apply to pose bones (which are Y-up).
+# Transformation to apply to pose bones (which are Y-up): 180 degree
+# rotation around Y-axis.
 t_pose = Matrix(((-1, 0,  0, 0),
                  (0, 1,  0, 0),
                  (0, 0, -1, 0),
@@ -50,10 +51,9 @@ class PrepareExportToUnity(bpy.types.Operator):
         # objects away.
         datas = {None}
         arms = []
-        # Iterate over selected objects from scene root to deepest
-        # children
-        obs = sorted(context.selected_editable_objects, key=get_lvl)
-        for o in obs:
+        # First iterate over root objects, then over their children, and
+        # so on.
+        for o in sorted(context.selected_editable_objects, key=get_lvl):
             data = o.data
             if data not in datas:
                 # Transforms the object's data so that the object does
@@ -63,6 +63,8 @@ class PrepareExportToUnity(bpy.types.Operator):
                 if o.type == 'ARMATURE':
                     # Transform pose bones
                     for b in o.pose.bones:
+                        # Rotate 180 degrees around origin, without
+                        # rotating the bone itself
                         b.matrix_basis = t_pose @ b.matrix_basis @ t_pose
                     arms.append(o)
             # Set every object's location and add a rotation of 90

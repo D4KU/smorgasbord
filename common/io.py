@@ -115,16 +115,16 @@ def get_parts(verts):
     verts.ensure_lookup_table()
     parts = []
 
-    for idx, visited in enumerate(flags):
+    for i, visited in enumerate(flags):
         if visited:
             continue
 
+        flags[i] = True
         # Vertex indices of one loose part
         indcs = []
-        # Vertices to be traversed
-        stack = [verts[idx]]
-        flags[idx] = True
 
+        # Vertices to be traversed
+        stack = [verts[i]]
         while stack:
             v = stack.pop()
             indcs.append(v.index)
@@ -134,7 +134,31 @@ def get_parts(verts):
                 v2 = e.other_vert(v)
                 # but only if not already checked
                 if not flags[v2.index]:
-                    stack.append(v2)
                     flags[v2.index] = True
+                    stack.append(v2)
         parts.append(indcs)
     return parts
+
+
+def get_lvl(ob):
+    """
+    Returns the number of parents of a given object, or, in other words,
+    it's level of deepness in the scene tree.
+
+    Parameters
+    ----------
+    ob : bpy.types.object
+        Blender object
+
+    Returns
+    -------
+    lvl : int
+        The number of parents of the object. For 'None' -1 is returned.
+    """
+    lvl = -1
+    while ob:
+        ob = ob.parent
+        lvl += 1
+    return lvl
+
+
