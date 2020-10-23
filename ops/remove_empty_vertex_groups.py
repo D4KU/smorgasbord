@@ -29,6 +29,12 @@ class RemoveEmptyVertexGroups(bpy.types.Operator):
         max=1,
     )
 
+    limit_to_arms: bpy.props.BoolProperty(
+        name="Limit to armatures",
+        description="Only keep vertex groups linked to an armature",
+        default=True,
+    )
+
     @classmethod
     def poll(cls, context):
         return len(context.selected_objects) > 0
@@ -50,12 +56,21 @@ class RemoveEmptyVertexGroups(bpy.types.Operator):
                 # bigger than the threshold
                 to_remov[gindcs[weights > self.threshold]] = False
 
+            if self.limit_to_arms:
+                # Get bones names of all armatures linked to this object
+                bonenames = set()
+                for m in o.modifiers:
+                    if m.type == 'ARMATURE' and m.object:
+                        bonenames.update(m.object.data.bones.keys())
+
+                # Mark every vertex group not found under the bone names
+                # as 'to remove'
+                for i, name in enumerate(vgs.keys()):
+                    if name not in bonenames:
+                        to_remov[i] = True
+
             # Remove groups which still have the remove flag set
             for g in np.array(vgs)[to_remov]:
                 vgs.remove(g)
 
         return {'FINISHED'}
-
-
-if __name__ == "__main__":
-    register()
