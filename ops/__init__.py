@@ -1,9 +1,11 @@
 from smorgasbord.ops import (
     align_bounds,
     apply_name,
+    force_apply_modifier,
     lerp_weight,
     material_transfer,
     prepare_export_to_unity,
+    remove_similar_uv_maps,
     remove_empty_vertex_groups,
     replace_by_primitive,
     replace_duplicate_materials,
@@ -12,6 +14,7 @@ from smorgasbord.ops import (
     select_loose_by_size,
     select_similar,
     set_parent_advanced,
+    vertex_color_to_group,
 )
 
 
@@ -31,4 +34,3 @@ def unregister():
 
 if __name__ == '__main__':
     register()
-

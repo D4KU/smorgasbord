@@ -185,7 +185,34 @@ material without such a suffix, if such a material exists. For example,
 
 `[Object mode] Object > Transform > Prepare Export to Unity`
 
-A crude script that applies a rotation and scaling to every selected object to
-transform the coordinate system and units used in Blender to those used in the
-Unity Game Engine. This script uses the `Apply Transform` function, which
-makes it destructive and fail on shared mesh data.
+Applies a rotation to every selected object so that when imported to Unity,
+the Y and Z axis are swapped and no unwanted transformations are applied. The
+result from applying this operator twice is the same as not applying it at
+all.
+
+
+### Vertex Color to Group
+
+`[Object mode] Object Data Properties > Vertex Group Context Menu`
+
+For every selected object, convert the active vertex color layer into a
+eponymous vertex group. To convert from RGB values to scalar weights either
+all channels are averaged or only individual ones are passed through.
+
+
+### Remove Empty Vertex Groups
+
+`[Object mode] Object Data Properties > Vertex Group Context Menu`
+
+For every vertex group of every selected object, delete all groups not
+containing any weights above a given threshold.
+
+
+### Remove Similar UV Maps
+
+`[Object mode] Search`
+
+For every active UV map of every selected object, calculate the similarity to
+other maps and remove them if they fall under a given threshold. Similarity is
+computed by summing the absolute distances between each pair of UV coordinates
+in both compared maps.
