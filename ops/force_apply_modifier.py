@@ -1,6 +1,4 @@
-import bmesh as bm
 import bpy
-import mathutils as mu
 
 from smorgasbord.common.decorate import register
 
@@ -15,7 +13,7 @@ class ForceApplyModifier(bpy.types.Operator):
         "given modifier, and then overwriting the original data block "
         "with the copy")
     bl_options = {'REGISTER', 'UNDO'}
-    menus = []
+    menus = [bpy.types.VIEW3D_MT_object_apply]
 
     name: bpy.props.StringProperty(
         name="Modifier",

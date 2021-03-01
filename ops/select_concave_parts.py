@@ -150,7 +150,6 @@ class SelectConcaveParts(bpy.types.Operator):
             # second representation of patches, this time as a tuple of
             # face indices, max angle, and diameter
             patches2 = []
-            normals = get_vecs(polys, attr='normal')
 
             for findcs, maxangl in patches:
                 bounds, _ = get_bounds_and_center(centrs[findcs])
@@ -173,7 +172,3 @@ class SelectConcaveParts(bpy.types.Operator):
                     _selall(bfaces[findcs])
             bm.update_edit_mesh(mesh)
         return {'FINISHED'}
-
-
-if __name__ == "__main__":
-    register()

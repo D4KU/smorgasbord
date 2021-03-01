@@ -70,7 +70,6 @@ class LerpWeight(bpy.types.Operator):
         b2 = transf_point(arm2wrld, bone2.head_local)
 
         dims = np.array(self.axes)
-        ndims = np.sum(dims)
 
         # Vector from bone1 to bone2, if wished projected onto the
         # axis/plane isolated through the 'axes' parameter by zeroing
@@ -154,7 +153,3 @@ class LerpWeight(bpy.types.Operator):
                 else:
                     bpy.ops.object.mode_set(mode='EDIT')
         return {'FINISHED'}
-
-
-if __name__ == "__main__":
-    register()

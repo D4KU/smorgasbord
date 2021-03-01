@@ -14,7 +14,7 @@ from smorgasbord.thirdparty.redblack.redblack import TreeDict
 
 @register
 class SelectLooseBySize(bpy.types.Operator):
-    bl_idname = "select.select_loose_by_size"
+    bl_idname = "object.select_loose_by_size"
     bl_label = "Select Loose by Size"
     bl_description = "Select loose mesh parts in a given size range"
     bl_options = {'REGISTER', 'UNDO'}
@@ -140,8 +140,3 @@ class SelectLooseBySize(bpy.types.Operator):
             bpy.ops.mesh.select_mode(use_extend=True, type='VERT')
 
         return {'FINISHED'}
-
-
-if __name__ == "__main__":
-    register()
-
