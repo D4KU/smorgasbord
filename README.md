@@ -19,6 +19,11 @@ high-polygonal meshes. It is also under development, so beware of bugs!
 2.10 [Select All by Name](#select-all-byname)  
 2.11 [Replace Duplicate Materials](#replace-duplicate-materials)  
 2.12 [Prepare Export to Unity](#prepare-export-to-unity)  
+2.13 [Vertex Color to Group](#vertex-color-to-group)  
+2.14 [Remove Empty Vertex Groups](#remove-empty-vertex-groups)  
+2.15 [Remove Similar UV Maps](#remove-similar-uv-maps)  
+2.16 [Force Apply Transform](#force-apply-transform)  
+2.17 [Force Apply Modifier](#force-apply-modifier)  
 
 
 # Installation
@@ -216,3 +221,31 @@ For every active UV map of every selected object, calculate the similarity to
 other maps and remove them if they fall under a given threshold. Similarity is
 computed by summing the absolute distances between each pair of UV coordinates
 in both compared maps.
+
+
+### Force Apply Transform
+
+`[Object mode] Object > Apply`
+
+Circumvents the restriction that an object's transform can't be applied to
+its mesh if that mesh is shared with other objects. After applying the active
+object's transform to the mesh, the local transform of other instances is
+updated so that they stay in place. If other objects are selected besides
+the active one, this compensation transformation is only applied to instances
+within the selection.
+
+Instead of setting the pivot point to the world origin, it can alternatively
+be set to the cursor. This results in the same behaviour as the built-in
+`Set origin to 3D cursor` operator, with the distinction that other instances
+are updated so that they don't jump around.
+
+
+### Force Apply Modifier
+
+`[Object mode] Object > Apply`
+
+Circumvents the restriction that modifiers can't be applied to linked data.
+The data block is copied, the given modifier applied to it, and then the
+original data block is overwritten with the copy for every selected object.
+If no object is selected in addition to the active one, all objects in the
+scene are considered selected.
