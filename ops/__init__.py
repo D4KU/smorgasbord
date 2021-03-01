@@ -2,6 +2,7 @@ from smorgasbord.ops import (
     align_bounds,
     apply_name,
     force_apply_modifier,
+    force_apply_transform,
     lerp_weight,
     material_transfer,
     prepare_export_to_unity,
