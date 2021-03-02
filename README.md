@@ -93,7 +93,7 @@ a given maximum threshold.
 
 `[Object mode] Select > Select Similar`
 
-This in an implementation of *Osada et al.'s* paper *Matching 3D Models with
+This is an implementation of *Osada et al.'s* paper *Matching 3D Models with
 Shape Distributions*. By selecting an object and choosing similarity measure
 limits, one can find objects with a similar shape in the scene. The method is
 scale- and rotation-invariant, but it is pretty simple, without any usage of
