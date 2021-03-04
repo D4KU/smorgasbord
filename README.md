@@ -24,6 +24,7 @@ high-polygonal meshes. It is also under development, so beware of bugs!
 2.15 [Remove Similar UV Maps](#remove-similar-uv-maps)  
 2.16 [Force Apply Transform](#force-apply-transform)  
 2.17 [Force Apply Modifier](#force-apply-modifier)  
+2.18 [Select N Instances](#select-n-instances)  
 
 
 # Installation
@@ -249,3 +250,28 @@ The data block is copied, the given modifier applied to it, and then the
 original data block is overwritten with the copy for every selected object.
 If no object is selected in addition to the active one, all objects in the
 scene are considered selected.
+
+### Select N Instances
+
+`[Object mode] Select > Select N Instances`
+
+For each data of selected objects, select N objects sharing the same data.
+This can be mesh-, light-, curve-, camera-, armature-data, etc. Even
+Empties are considered instances of another, since they all share 'None'
+as common data.
+
+N is set by a lower and upper bound. Negative values count from the end of the
+instance list. For the upper bound, non-negative values less equal the lower
+bound are considered as infinity. The order of instances is determined by
+their occurrence in the scene hierarchy. A few examples:
+
+- from 0 to 0: select all
+- from 0 to 1: select first instance
+- from 1 to 2: select second instance
+- from 0 to -1: select all but the last instance
+- from 5 to 0: select all from the fifth instance onward
+- from 5 to 1: likewise
+- from 5 to 5: likewise
+- from -1 to 0: select nothing (not supported)
+- from -1 to 3: likewise
+- from -2 to -1: select last instance

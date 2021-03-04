@@ -13,6 +13,7 @@ from smorgasbord.ops import (
     select_by_name,
     select_concave_parts,
     select_loose_by_size,
+    select_n_instances,
     select_similar,
     set_parent_advanced,
     vertex_color_to_group,
