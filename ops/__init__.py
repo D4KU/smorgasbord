@@ -16,6 +16,7 @@ from smorgasbord.ops import (
     select_n_instances,
     select_similar,
     set_parent_advanced,
+    smart_parent_to_empty,
     vertex_color_to_group,
 )
 
