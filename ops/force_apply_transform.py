@@ -38,9 +38,8 @@ class ForceApplyTransform(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         a = context.mode == 'OBJECT'
-        b = context.object is not None
-        c = context.object.type == 'MESH'
-        return a and b and c
+        b = bool(context.object)
+        return a and b and context.object.type == 'MESH'
 
     def execute(self, context):
         ob = context.object
