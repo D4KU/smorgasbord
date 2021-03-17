@@ -1,5 +1,4 @@
 import bpy
-import mathutils as mu
 import re
 
 from smorgasbord.common.decorate import register
@@ -32,13 +31,13 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
         description=(
             "When no material with a shortened name exists, create it."
         ),
-        default=True,
+        default=False,
     )
 
     merge_slots: bpy.props.BoolProperty(
         name="Merge equal slots",
         description="Merge slots ending up with the same material",
-        default=True,
+        default=False,
     )
 
     @classmethod
@@ -124,7 +123,3 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
 
             return True
         return False
-
-
-if __name__ == "__main__":
-    register()
