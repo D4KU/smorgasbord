@@ -138,27 +138,3 @@ def get_parts(verts):
                     stack.append(v2)
         parts.append(indcs)
     return parts
-
-
-def get_lvl(ob):
-    """
-    Returns the number of parents of a given object, or, in other words,
-    it's level of deepness in the scene tree.
-
-    Parameters
-    ----------
-    ob : bpy.types.object
-        Blender object
-
-    Returns
-    -------
-    lvl : int
-        The number of parents of the object. For 'None' -1 is returned.
-    """
-    lvl = -1
-    while ob:
-        ob = ob.parent
-        lvl += 1
-    return lvl
-
-

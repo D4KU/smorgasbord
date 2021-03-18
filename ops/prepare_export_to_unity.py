@@ -2,7 +2,7 @@ import bpy
 from mathutils import Matrix
 from math import pi
 from smorgasbord.common.decorate import register
-from smorgasbord.common.io import get_lvl
+from smorgasbord.common.hierarchy import get_lvl
 
 
 # Swap Y with Z and invert X to transform a right-handed Z-up
