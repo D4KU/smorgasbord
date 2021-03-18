@@ -4,6 +4,7 @@ from mathutils import Vector
 
 from smorgasbord.common.decorate import register
 from smorgasbord.common.io import get_bounds_and_center
+from smorgasbord.common.hierarchy import set_parent
 
 
 @register
@@ -13,7 +14,9 @@ class SmartParentToEmpty(bpy.types.Operator):
     bl_description = (
         "Parent every selected object to a newly created Empty and "
         "name it after the longest common substring in the names of "
-        "all selected objects"
+        "all selected objects. The Empty is parented to the former "
+        "parent of the active object. If no active object exists, "
+        "the first selected object is chosen instead."
     )
     bl_options = {'REGISTER', 'UNDO'}
     menus = [bpy.types.VIEW3D_MT_mesh_add]
@@ -23,16 +26,29 @@ class SmartParentToEmpty(bpy.types.Operator):
         items=[
             ('CURSOR', "Cursor", "At the 3D cursor"),
             ('ACTIVE', "Active", "At the active object"),
-            ('CENTER', "Center", (
-                "In contrast to the eponymous function of the 'Extra "
-                "Objects' plugin, the center is calculated as the "
-                "median position of all selected objects, not the "
-                "mean. This better handles outliers"
-                )
-            ),
+            ('CENTER', "Center", "Average position of selected objects"),
         ],
         description="Where to place the created parent object",
+        default='CURSOR',
        )
+
+    set_inv: bpy.props.BoolProperty(
+        name="Set Inverse",
+        description=(
+            "If true, the origin of the re-parented objects is the "
+            "world origin. If false, it is the new Empty's location"
+        ),
+        default=True,
+    )
+
+    to_strip: bpy.props.StringProperty(
+        name="Chars to Strip",
+        description=(
+            "Characters to be stripped from the end of the calculated "
+            "name of the new Empty."
+        ),
+        default=" _.",
+    )
 
     @classmethod
     def poll(cls, context):
@@ -40,29 +56,37 @@ class SmartParentToEmpty(bpy.types.Operator):
 
     def execute(self, context):
         sel = context.selected_objects
+        ob = context.object
 
         # Determine spawn position of new parent object
         if self.loc == 'CENTER':
             obs = [o.location for o in sel]
-            loc = Vector(get_bounds_and_center(obs)[1])
-        elif self.loc == 'ACTIVE' and context.object:
-            loc = context.object.location
+            paloc = Vector(get_bounds_and_center(obs)[1])
+        elif self.loc == 'ACTIVE' and ob:
+            paloc = ob.location
         else:
-            loc = context.scene.cursor.location
+            paloc = context.scene.cursor.location
+
+        # Parent name is the longest common substring of all selected
+        # objects
+        paname = os.path.commonprefix([o.name for o in sel])
+        paname = paname.rstrip(self.to_strip) if paname else "Empty"
 
         # Create new Empty parent object
-        # Set its name to the longest common substring of all selected
-        # objects
-        name = os.path.commonprefix([o.name for o in sel])
-        name = "Empty" if not name else name
-        ob = bpy.data.objects.new(name, None)
-        ob.location = loc
-        context.collection.objects.link(ob)
+        pa = bpy.data.objects.new(paname, None)
+        pa.location = paloc
 
-        # Set the parent of all selected objects
+        # Idol is the object determining the new Empty's parent and
+        # collection
+        idol = ob if ob else sel[0]
+        pa.parent = idol.parent
+        if idol.parent:
+            pa.matrix_parent_inverse = idol.parent.matrix_world.inverted()
+        idol.users_collection[0].objects.link(pa)
+
+        context.view_layer.update()
+        # Set the parent of all selected objects to 'pa'
         for o in sel:
-            o.parent = ob
-            # Make sure reparenting doesn't make objects jump
-            o.location -= loc
+            set_parent(o, pa, self.set_inv)
 
         return {'FINISHED'}
