@@ -39,6 +39,10 @@ class RemoveSimilarUvMaps(bpy.types.Operator):
                 continue
 
             ls = o.data.uv_layers
+            if not ls.active:
+                # 'o' has no UV Map
+                continue
+
             uvs_a = get_vecs(ls.active.data, attr='uv', vecsize=2)
             to_del = []
             for i, l in enumerate(ls):
