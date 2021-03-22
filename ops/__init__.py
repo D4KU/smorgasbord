@@ -6,6 +6,7 @@ from smorgasbord.ops import (
     lerp_weight,
     material_transfer,
     prepare_export_to_unity,
+    prepend_name_to_children,
     quick_fix_objects,
     remove_similar_uv_maps,
     remove_empty_vertex_groups,
