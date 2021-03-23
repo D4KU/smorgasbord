@@ -3,6 +3,7 @@ from smorgasbord.ops import (
     apply_name,
     force_apply_modifier,
     force_apply_transform,
+    join_as_vertex_group,
     lerp_weight,
     material_transfer,
     prepare_export_to_unity,
