@@ -15,13 +15,12 @@ class Blank(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return len(context.selected_objects) > 0
+        a = context.mode == 'OBJECT'
+        b = context.object is not None
+        c = context.object.type == 'MESH'
+        return a and b and c
 
     def execute(self, context):
-        for o in context.selected_objects:
+        for o in context.selected_editable_objects:
             pass
         return {'FINISHED'}
-
-
-if __name__ == "__main__":
-    register()
