@@ -20,6 +20,9 @@ class QuickFixObjects(bpy.types.Operator):
 
     def execute(self, context):
         for o in context.selected_objects:
+            if o.type != 'MESH':
+                continue
+
             context.view_layer.objects.active = o
             bpy.ops.mesh.customdata_custom_splitnormals_clear()
 
