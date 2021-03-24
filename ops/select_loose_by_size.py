@@ -1,6 +1,6 @@
+import bmesh
 import bpy
 import numpy as np
-from bmesh import from_edit_mesh
 from operator import concat
 
 from smorgasbord.common.decorate import register
@@ -85,23 +85,29 @@ class SelectLooseBySize(bpy.types.Operator):
     def poll(cls, context):
         return context.mode == 'EDIT_MESH'
 
-    def _find_parts(self, context):
-        for o in context.objects_in_mode:
-            data = o.data
-            parts = TreeDict(acc=concat)
-            coords = get_vecs(data.vertices)
+    def _find_parts(self, obs):
+        for o in obs:
+            # get parts, each a vertex index list
+            bob = bmesh.new()
+            bob.from_mesh(o.data)
+            parts = get_parts(bob.verts)
+            del bob
+
             # choose comparison method
             method = np.linalg.norm if self._method == 0 else np.prod
 
-            for indcs in get_parts(from_edit_mesh(data).verts):
+            # create dict of parts and their comparison value
+            partdict = TreeDict(acc=concat)
+            coords = get_vecs(o.data.vertices)
+            for indcs in parts:
                 bounds, _ = get_bounds_and_center(coords[indcs])
                 # calculate comparison value from bounding box,
                 # round to create less bins in dict for better
                 # performance
                 key = round(method(bounds), self._resolution)
-                parts[key] = indcs
+                partdict[key] = indcs
 
-            self._data.append((data.vertices, parts))
+            self._data.append((o.data.vertices, partdict))
 
     def invoke(self, context, event):
         # Without invoke(), executing this operation several times
@@ -113,11 +119,14 @@ class SelectLooseBySize(bpy.types.Operator):
         return self.execute(context)
 
     def execute(self, context):
-        if not self._data:
-            self._find_parts(context)
+        obs = context.objects_in_mode
 
         # the mesh doesn't update if we stay in edit mode
         bpy.ops.object.mode_set(mode='OBJECT')
+
+        if not self._data:
+            self._find_parts(obs)
+
         minv, maxv = self._vol_limits
         try:
             for verts, parts in self._data:
