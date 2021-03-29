@@ -7,7 +7,7 @@ def to_transl_mat(vec):
 
     Parameters
     ----------
-    vec : numpy.ndarray
+    vec : array_like
         Vector of x,y,z coordinates.
 
     Returns
@@ -24,7 +24,7 @@ def to_transl_mat(vec):
            [0, 0, 0, 1]])
     """
     mat = np.identity(4)
-    mat[:-1,-1:] = vec.reshape(3,1)
+    mat[:-1, -1:] = np.asarray(vec).reshape(3, 1)
     return mat
 
 
@@ -34,7 +34,7 @@ def to_scale_mat(vec):
 
     Parameters
     ----------
-    vec : numpy.ndarray
+    vec : array_like
         Vector of x,y,z scale factors.
 
     Returns
@@ -49,7 +49,8 @@ def to_scale_mat(vec):
            [0, 8, 0],
            [0, 0, 9]])
     """
-    return np.identity(vec.shape[0]) * vec
+    v = np.asarray(vec)
+    return np.identity(v.shape[0]) * v
 
 
 def euler_to_rot_mat(thetas):
@@ -58,7 +59,7 @@ def euler_to_rot_mat(thetas):
 
     Parameters
     ----------
-    thetas : numpy.ndarray
+    thetas : array_like
         3D vector with rotation along X, Y, Z axes respectively in radians
 
     Returns
@@ -73,19 +74,19 @@ def euler_to_rot_mat(thetas):
                      [-sy,   cy*sx,            cy*cx]])
 
 
-def make_transf_mat(transl=np.zeros(3), rot=np.zeros(3), scale=np.ones(3)):
+def make_transf_mat(transl=(0, 0, 0), rot=(0, 0, 0), scale=(1, 1, 1)):
     """
     Construct a 4x4 transformation matrix from 3 vectors for translation,
     rotation, and scale, respectively.
 
     Parameters
     ----------
-    transl : numpy.ndarray = (0, 0, 0)
+    transl : array_like = (0, 0, 0)
         3D vector with translation offsets along the X, Y, Z axes respectively
-    rot: numpy.ndarray = (0, 0, 0)
+    rot: array_like = (0, 0, 0)
         3D vector with rotation angles along the X, Y, Z axes respectively in
         radians
-    scale : numpy.ndarray = (1, 1, 1)
+    scale : array_like = (1, 1, 1)
         3D vector with scale factors along the X, Y, Z axes respectively
 
     Returns
@@ -93,7 +94,7 @@ def make_transf_mat(transl=np.zeros(3), rot=np.zeros(3), scale=np.ones(3)):
     mat : numpy.ndarray
         4x4 transformation matrix
     """
-    return to_transl_mat(transl) @ append_row_and_col( \
+    return to_transl_mat(transl) @ append_row_and_col(
         euler_to_rot_mat(rot) @ to_scale_mat(scale))
 
 
@@ -120,6 +121,37 @@ def append_row_and_col(mat):
            [0, 0, 1]])
     """
     new_mat = np.eye(*np.add(mat.shape, 1))
-    new_mat[:-1,:-1] = mat
+    new_mat[:-1, :-1] = mat
     return new_mat
 
+
+def make_proj_mat(
+        fov=50,
+        ortho=False,
+        clip_start=.1,
+        clip_end=1000,
+        dimx=512,
+        dimy=512,
+        ):
+    right = 0 if ortho else clip_start * np.tan(np.radians(fov) * .5)
+    left = -right
+    top = right * (dimy / dimx)
+    bottom = -top
+    xdelta = right - left
+    ydelta = top - bottom
+    zdelta = clip_end - clip_start
+
+    mat = np.zeros((4, 4))
+    if ortho:
+        mat[0][0] = 2 / xdelta
+        mat[1][1] = 2 / ydelta
+        mat[2][2] = -2 / zdelta
+        mat[2][3] = -(clip_end + clip_start) / zdelta
+        mat[3][3] = 1
+    else:
+        mat[0][0] = clip_start * 2 / xdelta
+        mat[1][1] = clip_start * 2 / ydelta
+        mat[2][2] = -(clip_end + clip_start) / zdelta
+        mat[2][3] = (-2 * clip_start * clip_end) / zdelta
+        mat[3][2] = -1
+    return mat

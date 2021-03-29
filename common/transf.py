@@ -45,23 +45,25 @@ def homog_vecs(vecs):
     return hvecs
 
 
-def transf_vecs(mat, vecs):
+def transf_vecs(mat, pts):
     """
-    Apply a transformation matrix to every vector in a list.
+    Apply a transformation matrix to every point in a list.
 
     Parameters
     ----------
     mat : Iterable
-        4x4 transformation matrix to apply to every vector
-    vecs : Iterable
-        List of 3D vertices
+        4x4 transformation matrix to apply to every point
+    pts : Iterable
+        List of 3D points
 
     Returns
     -------
-    vecs : numpy.ndarray
-        Copy of 'vecs' with transformed coordinates
+    pts : numpy.ndarray
+        Copy of 'pts' with transformed coordinates
     """
-    return (np.asanyarray(mat) @ homog_vecs(vecs).T).T[:, :3]
+    # blender.stackexchange.com/a/139513
+    # return np.einsum('ij,aj->ai', mat, homog_vecs(pts))[:, :-1]
+    return (np.asanyarray(mat) @ homog_vecs(pts).T).T[:, :3]
 
 
 def transf_point(mat, point):

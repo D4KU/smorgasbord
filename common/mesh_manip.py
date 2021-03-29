@@ -9,6 +9,46 @@ from smorgasbord.common.mat_manip import make_transf_mat
 from smorgasbord.common.transf import transf_vecs
 
 
+def get_combined_geo(obs):
+    v_totlen = 0
+    i_totlen = 0
+    for o in obs:
+        mesh = o.data
+        mesh.calc_loop_triangles()
+        v_totlen += len(mesh.vertices)
+        i_totlen += len(mesh.loop_triangles)
+
+    verts = np.empty(v_totlen * 3, dtype=np.float32)
+    indcs = np.empty(i_totlen * 3, dtype=np.int32)
+    vstart = 0
+    istart = 0
+
+    for o in obs:
+        mesh = o.data
+        vend = vstart + len(mesh.vertices) * 3
+        iend = istart + len(mesh.loop_triangles) * 3
+        vslice = verts[vstart:vend]
+        islice = indcs[istart:iend]
+
+        # Vertices
+        mesh.vertices.foreach_get('co', vslice)
+        verts[vstart:vend] = transf_vecs(
+            o.matrix_world.inverted(),
+            vslice.reshape(-1, 3),
+            ).ravel()
+
+        # Indices
+        mesh.loop_triangles.foreach_get('vertices', islice)
+        islice += int(vstart / 3)
+
+        vstart = vend
+        istart = iend
+
+    verts.shape = (-1, 3)
+    indcs.shape = (-1, 3)
+    return verts, indcs
+
+
 def get_unit_cube():
     """
     Returns vertex coordinates and face indices for a unit cube.

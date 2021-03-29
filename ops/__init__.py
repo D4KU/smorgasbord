@@ -15,6 +15,7 @@ from smorgasbord.ops import (
     replace_duplicate_materials,
     select_by_name,
     select_concave_parts,
+    select_hidden,
     select_loose_by_size,
     select_n_instances,
     select_similar,
