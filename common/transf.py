@@ -45,6 +45,12 @@ def homog_vecs(vecs):
     return hvecs
 
 
+def transf_pts_unsliced(mat, pts):
+    # blender.stackexchange.com/a/139513
+    # return np.einsum('ij,aj->ai', mat, homog_vecs(pts))[:, :-1]
+    return (np.asanyarray(mat) @ homog_vecs(pts).T).T
+
+
 def transf_vecs(mat, pts):
     """
     Apply a transformation matrix to every point in a list.
@@ -61,9 +67,7 @@ def transf_vecs(mat, pts):
     pts : numpy.ndarray
         Copy of 'pts' with transformed coordinates
     """
-    # blender.stackexchange.com/a/139513
-    # return np.einsum('ij,aj->ai', mat, homog_vecs(pts))[:, :-1]
-    return (np.asanyarray(mat) @ homog_vecs(pts).T).T[:, :3]
+    return transf_pts_unsliced(mat, pts)[:, :3]
 
 
 def transf_point(mat, point):
