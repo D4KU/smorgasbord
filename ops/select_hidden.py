@@ -5,23 +5,20 @@ import gpu
 import numpy as np
 
 from mathutils import Matrix
-from random import random
 from gpu_extras.batch import batch_for_shader
-from gpu_extras.presets import draw_texture_2d
 
 from smorgasbord.common.decorate import register
-from smorgasbord.common.io import get_vecs
 from smorgasbord.common.mesh_manip import get_combined_geo
+from smorgasbord.common.sample import sample_hemisphere
 from smorgasbord.common.transf import transf_pts_unsliced
 from smorgasbord.common.mat_manip import (
+    make_transf_mat,
     make_proj_mat,
-    to_transl_mat,
-    euler_to_rot_mat,
-    append_row_and_col,
     )
 
 
-def get_shader(name):
+shader = None
+def read_shader(name):
     path = os.path.realpath(__file__)
     path = os.path.dirname(path) + "/../shader/" + name
     with open(path + ".vert") as f:
@@ -67,113 +64,96 @@ class SelectHidden(bpy.types.Operator):
         return a and b and context.object.type == 'MESH'
 
     def execute(self, context):
+        global shader
         dimx, dimy = self.res
-        reshalf = np.array(self.res) * .5
-        depth_shader = get_shader("depthpass")
-        depth_shader.bind()
-        # comp_shader = get_shader("compare")
+        if not shader:
+            shader = read_shader("depthpass")
+        shader.bind()
         offbuf = gpu.types.GPUOffScreen(*self.res)
 
         # Create batch
         ob = context.object
-        obs = context.selected_editable_objects
-        obs = [o for o in obs if o is not ob and o.type == 'MESH']
-        # TODO remember which ones are ob's vertices
-        obs.append(ob)
-        verts, indcs = get_combined_geo(obs)
+        obs = [ob]
+        for o in context.selected_editable_objects:
+            if o.type == 'MESH' and o is not ob:
+                obs.append(o)
+        verts, indcs, info = get_combined_geo(obs)
         batch = batch_for_shader(
-            depth_shader, 'TRIS',
+            shader, 'TRIS',
             {"pos": verts},
             indices=indcs,
         )
 
+        # Isolate active objects' vertices
+        verts = verts[:info[0][0]]
+        del indcs, info
+
         # Generate random points on a hemisphere
         rad = 4
-        sel = None
         for i in range(self.samplecnt):
-            costheta = np.sqrt(random())
-            theta = np.arccos(costheta)
-            sintheta = rad * np.sin(theta)
-            phi = 2 * np.pi * random()
-
-            x = sintheta * np.cos(phi)
-            y = sintheta * np.sin(phi)
-            z = rad * costheta
-
-            rot = euler_to_rot_mat((0, theta, phi)) \
-                @ euler_to_rot_mat((0, 0, np.pi * .5))
-            tranf = to_transl_mat((x, y, z)) @ append_row_and_col(rot)
-
-            view_mat = np.linalg.inv(tranf)
-            proj_mat = make_proj_mat(
-                clip_start=rad * .75,
-                clip_end=rad,
-                dimx=dimx,
-                dimy=dimy,
-                )
-            mvp = proj_mat @ view_mat
-            depth_shader.uniform_float("mvp", Matrix(mvp))
-            # comp_shader.bind()
-            # comp_shader.uniform_float("mvp", mvp)
+            x, y, z, phi, theta = sample_hemisphere(rad)
+            transf = make_transf_mat((x, y, z), (theta, 0, phi + np.pi * .5))
 
             # bpy.ops.object.camera_add()
-            # bpy.context.object.matrix_world = Matrix(tranf)
+            # bpy.context.object.matrix_world = Matrix(transf)
 
-            offbuf.bind()
-            bgl.glClear(bgl.GL_COLOR_BUFFER_BIT | bgl.GL_DEPTH_BUFFER_BIT)
-            bgl.glEnable(bgl.GL_DEPTH_TEST)
-            batch.draw(depth_shader)
-            # bgl.glActiveTexture(bgl.GL_TEXTURE0)
-            # bgl.glBindTexture(bgl.GL_TEXTURE_2D, offbuf.color_texture)
-            # comp_shader.uniform_int("depthtex", 0)
-            # batch.draw(comp_shader)
-            bgl.glDisable(bgl.GL_DEPTH_TEST)
+            mvp = make_proj_mat(
+                clip_start=rad * .75,
+                clip_end=rad * 1.5,
+                dimx=dimx,
+                dimy=dimy,
+                ) @ np.linalg.inv(transf)
+            shader.uniform_float("mvp", Matrix(mvp))
+            del transf, x, y, z, phi, theta
 
-            # Write texture back to CPU
-            pxbuf = bgl.Buffer(bgl.GL_BYTE, dimx * dimy * 4)
-            bgl.glReadBuffer(bgl.GL_BACK)
-            bgl.glReadPixels(0, 0, dimx, dimy, bgl.GL_RGBA, bgl.GL_UNSIGNED_BYTE, pxbuf)
-            pxbuf = np.array(pxbuf)
-            pxbuf.shape = (dimx, dimy, 4)
+            with offbuf.bind():
+                bgl.glClearColor(1, 1, 1, 0)
+                bgl.glClear(bgl.GL_COLOR_BUFFER_BIT |
+                            bgl.GL_DEPTH_BUFFER_BIT)
+                bgl.glEnable(bgl.GL_DEPTH_TEST)
+                batch.draw(shader)
 
-            # Filter out red channel
-            pxbuf = pxbuf[:, :, :1]
-            pxbuf.shape = (dimx, dimy)
+                # Write texture back to CPU
+                pxbuf = bgl.Buffer(bgl.GL_BYTE, dimx * dimy)
+                bgl.glReadBuffer(bgl.GL_BACK)
+                bgl.glReadPixels(0, 0, dimx, dimy, bgl.GL_RED,
+                                 bgl.GL_UNSIGNED_BYTE, pxbuf)
+                pxbuf = np.array(pxbuf) / 255
+                pxbuf.shape = (dimx, dimy)
 
-            # Transform verts to clip space
+            # Transform verts of active object to clip space
             # TODO create in Fortran order or sth
             verts_cs = transf_pts_unsliced(mvp, verts)
             # Perspective divide to transform to NDC
-            uvs = verts_cs[:, :2] / verts_cs[:, 3:]
+            verts_cs /= verts_cs[:, 3:]
+            verts_cs *= .5
+            verts_cs += .5
 
             # Remap from NDC to pixel coordinates, or in other words
             # from [-1,1] to [0, dimx] for all x coords and [0, dimy]
             # for all y coords
-            # Finally add .5 to make sure the flooring from conversion
-            # to int is actually rounding
-            # This is '(a * .5 + .5) * res + .5' rearranged to
-            # 'a * (res * .5) + (res * .5 + .5)' to save instructions
-            uvs *= reshalf
-            uvs += reshalf + .5
+            # Add .5 to make sure the flooring from conversion to int
+            # is actually rounding
+            uvs = verts_cs[:, :2] * self.res + .5
             uvs = uvs.astype(np.int32)
+            uvs = (uvs[:, 1:2], uvs[:, :1])
 
-            # Sample pixel corresponding to each vertex
-            # Convert from numpy array indexing to tuple indexing
-            pxs = pxbuf[tuple(uvs.T)]
-            pxs = pxs.ravel()
-            depths = verts_cs[:, 2:3]
-            depths = depths.ravel()
-            sel = depths > pxs
-            breakpoint()
-            del pxbuf
+            dpth_img = pxbuf[uvs].ravel()
+            dpth_verts = verts_cs[:, 2:3].ravel()
+            sel = dpth_verts < (dpth_img - .001)
+            ob.data.vertices.foreach_set('select', sel)
 
-            ta = i * 10
-            tb = ta + 10
-            def draw():
-                draw_texture_2d(offbuf.color_texture, (ta, ta), tb, tb)
-            bpy.types.SpaceView3D.draw_handler_add(draw, (), 'WINDOW', 'POST_VIEW')
+            # pxbuf = np.repeat(pxbuf, 4)
+            # pxbuf.shape = (dimx, dimy, 4)
+            # pxbuf[:, :, 3:] = 1
+            # pxbuf[uvs] = (1, 0, 0, 1)
+            # imgname = "Debug"
+            # if imgname not in bpy.data.images:
+            #     bpy.data.images.new(imgname, dimx, dimy)
+            # image = bpy.data.images[imgname]
+            # image.pixels = pxbuf.ravel()
 
-
-
-        # offbuf.free()
+        offbuf.free()
+        # context.view_layer.objects.active = ob
+        # bpy.ops.object.mode_set(mode='EDIT')
         return {'FINISHED'}

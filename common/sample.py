@@ -2,6 +2,7 @@ import bpy
 import bmesh as bm
 import numpy as np
 
+from random import random
 from smorgasbord.common.io import get_scalars, get_vecs
 
 
@@ -109,3 +110,15 @@ def get_shape_distrib(points, bincnt=32):
         np.linalg.norm(points[i] - points[j], axis=1),
         bins=bincnt,
         )
+
+
+def sample_hemisphere(radius):
+    costheta = np.sqrt(random())
+    theta = np.arccos(costheta)
+    sintheta = radius * np.sin(theta)
+    phi = 2 * np.pi * random()
+
+    x = sintheta * np.cos(phi)
+    y = sintheta * np.sin(phi)
+    z = radius * costheta
+    return x, y, z, phi, theta

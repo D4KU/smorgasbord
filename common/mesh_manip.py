@@ -10,16 +10,18 @@ from smorgasbord.common.transf import transf_vecs
 
 
 def get_combined_geo(obs):
-    v_totlen = 0
-    i_totlen = 0
+    vtotlen = 0
+    itotlen = 0
+    info = []
     for o in obs:
         mesh = o.data
         mesh.calc_loop_triangles()
-        v_totlen += len(mesh.vertices)
-        i_totlen += len(mesh.loop_triangles)
+        vtotlen += len(mesh.vertices)
+        itotlen += len(mesh.loop_triangles)
+        info.append((vtotlen, itotlen))
 
-    verts = np.empty(v_totlen * 3, dtype=np.float32)
-    indcs = np.empty(i_totlen * 3, dtype=np.int32)
+    verts = np.empty(vtotlen * 3, dtype=np.float32)
+    indcs = np.empty(itotlen * 3, dtype=np.int32)
     vstart = 0
     istart = 0
 
@@ -46,7 +48,7 @@ def get_combined_geo(obs):
 
     verts.shape = (-1, 3)
     indcs.shape = (-1, 3)
-    return verts, indcs
+    return verts, indcs, info
 
 
 def get_unit_cube():
