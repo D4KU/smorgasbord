@@ -8,9 +8,10 @@ from mathutils import Matrix
 from gpu_extras.batch import batch_for_shader
 
 from smorgasbord.common.decorate import register
-from smorgasbord.common.mesh_manip import get_combined_geo
+from smorgasbord.common.mesh_manip import get_combined_geo, add_box_to_scene
 from smorgasbord.common.sample import sample_hemisphere
 from smorgasbord.common.transf import transf_pts_unsliced
+from smorgasbord.common.io import get_bounds_and_center
 from smorgasbord.common.mat_manip import (
     make_transf_mat,
     make_proj_mat,
@@ -45,11 +46,10 @@ class SelectHidden(bpy.types.Operator):
             description="",
             default=1,
     )
-    res: bpy.props.IntVectorProperty(
+    dim: bpy.props.IntProperty(
             name="Resolution",
             description="",
-            size=2,
-            default=(256, 256),
+            default=256,
     )
     onsphere: bpy.props.BoolProperty(
             name="Sample whole sphere",
@@ -65,11 +65,12 @@ class SelectHidden(bpy.types.Operator):
 
     def execute(self, context):
         global shader
-        dimx, dimy = self.res
+        dim = self.dim
+        dimhalf = dim * .5
         if not shader:
             shader = read_shader("depthpass")
         shader.bind()
-        offbuf = gpu.types.GPUOffScreen(*self.res)
+        offbuf = gpu.types.GPUOffScreen(dim, dim)
 
         # Create batch
         ob = context.object
@@ -84,12 +85,15 @@ class SelectHidden(bpy.types.Operator):
             indices=indcs,
         )
 
+        bounds, center = get_bounds_and_center(verts)
+        rad = np.linalg.norm(bounds[:2]) * .5 + 1
+        # bpy.ops.mesh.primitive_circle_add(location=center, radius=rad)
+
         # Isolate active objects' vertices
         verts = verts[:info[0][0]]
         del indcs, info
 
         # Generate random points on a hemisphere
-        rad = 4
         for i in range(self.samplecnt):
             x, y, z, phi, theta = sample_hemisphere(rad)
             transf = make_transf_mat((x, y, z), (theta, 0, phi + np.pi * .5))
@@ -98,10 +102,11 @@ class SelectHidden(bpy.types.Operator):
             # bpy.context.object.matrix_world = Matrix(transf)
 
             mvp = make_proj_mat(
-                clip_start=rad * .75,
+                fov=90,
+                clip_start=rad * .33,
                 clip_end=rad * 1.5,
-                dimx=dimx,
-                dimy=dimy,
+                dimx=dim,
+                dimy=dim,
                 ) @ np.linalg.inv(transf)
             shader.uniform_float("mvp", Matrix(mvp))
             del transf, x, y, z, phi, theta
@@ -114,43 +119,45 @@ class SelectHidden(bpy.types.Operator):
                 batch.draw(shader)
 
                 # Write texture back to CPU
-                pxbuf = bgl.Buffer(bgl.GL_BYTE, dimx * dimy)
+                pxbuf = bgl.Buffer(bgl.GL_BYTE, dim * dim)
                 bgl.glReadBuffer(bgl.GL_BACK)
-                bgl.glReadPixels(0, 0, dimx, dimy, bgl.GL_RED,
+                bgl.glReadPixels(0, 0, dim, dim, bgl.GL_RED,
                                  bgl.GL_UNSIGNED_BYTE, pxbuf)
-                pxbuf = np.array(pxbuf) / 255
-                pxbuf.shape = (dimx, dimy)
+                pxbuf = np.array(pxbuf) / 128 - 1
+                pxbuf.shape = (dim, dim)
 
             # Transform verts of active object to clip space
-            # TODO create in Fortran order or sth
-            verts_cs = transf_pts_unsliced(mvp, verts)
+            vcs = transf_pts_unsliced(mvp, verts)
             # Perspective divide to transform to NDC
-            verts_cs /= verts_cs[:, 3:]
-            verts_cs *= .5
-            verts_cs += .5
+            vcs /= vcs[:, 3:]
 
             # Remap from NDC to pixel coordinates, or in other words
-            # from [-1,1] to [0, dimx] for all x coords and [0, dimy]
-            # for all y coords
+            # from [-1,1] to [0, dim]
             # Add .5 to make sure the flooring from conversion to int
             # is actually rounding
-            uvs = verts_cs[:, :2] * self.res + .5
+            uvs = vcs[:, :2] * dimhalf + (dimhalf + .5)
             uvs = uvs.astype(np.int32)
+            invalid = np.any((uvs < 0) | (dim <= uvs), axis=1)
+            uvs[invalid] = (0, 0)
             uvs = (uvs[:, 1:2], uvs[:, :1])
 
             dpth_img = pxbuf[uvs].ravel()
-            dpth_verts = verts_cs[:, 2:3].ravel()
+            dpth_verts = vcs[:, 2:3].ravel()
+            dpth_verts[invalid] = 2
             sel = dpth_verts < (dpth_img - .001)
             ob.data.vertices.foreach_set('select', sel)
 
             # pxbuf = np.repeat(pxbuf, 4)
-            # pxbuf.shape = (dimx, dimy, 4)
+            # pxbuf.shape = (dim, dim, 4)
+            # pxbuf *= .5
+            # pxbuf += .5
             # pxbuf[:, :, 3:] = 1
             # pxbuf[uvs] = (1, 0, 0, 1)
             # imgname = "Debug"
             # if imgname not in bpy.data.images:
-            #     bpy.data.images.new(imgname, dimx, dimy)
+            #     bpy.data.images.new(imgname, dim, dim)
             # image = bpy.data.images[imgname]
+            # image.scale(dim, dim)
             # image.pixels = pxbuf.ravel()
 
         offbuf.free()

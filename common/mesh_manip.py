@@ -35,7 +35,7 @@ def get_combined_geo(obs):
         # Vertices
         mesh.vertices.foreach_get('co', vslice)
         verts[vstart:vend] = transf_vecs(
-            o.matrix_world.inverted(),
+            o.matrix_world,
             vslice.reshape(-1, 3),
             ).ravel()
 
