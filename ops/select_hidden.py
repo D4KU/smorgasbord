@@ -1,4 +1,3 @@
-import os
 import bgl
 import bpy
 import gpu
@@ -8,159 +7,211 @@ from mathutils import Matrix
 from gpu_extras.batch import batch_for_shader
 
 from smorgasbord.common.decorate import register
-from smorgasbord.common.mesh_manip import get_combined_geo, add_box_to_scene
-from smorgasbord.common.sample import sample_hemisphere
-from smorgasbord.common.transf import transf_pts_unsliced
+from smorgasbord.common.mesh_manip import get_combined_geo
+from smorgasbord.common.sample import sample_sphere, sample_hemisphere
+from smorgasbord.common.transf import homog_vecs
 from smorgasbord.common.io import get_bounds_and_center
-from smorgasbord.common.mat_manip import (
-    make_transf_mat,
-    make_proj_mat,
-    )
-
-
-shader = None
-def read_shader(name):
-    path = os.path.realpath(__file__)
-    path = os.path.dirname(path) + "/../shader/" + name
-    with open(path + ".vert") as f:
-        vert = f.read()
-    with open(path + ".frag") as f:
-        frag = f.read()
-
-    return gpu.types.GPUShader(vert, frag)
+from smorgasbord.common.mat_manip import make_transf_mat, make_proj_mat
 
 
 @register
-class SelectHidden(bpy.types.Operator):
-    bl_idname = "mesh.select_hidden"
-    bl_label = "Select Hidden"
+class SelectVisible(bpy.types.Operator):
+    bl_idname = "mesh.select_visible"
+    bl_label = "Select Visible"
     bl_description = ""
     bl_options = {'REGISTER', 'UNDO'}
-    menus = [
-        bpy.types.VIEW3D_MT_select_object,
-        bpy.types.VIEW3D_MT_select_edit_mesh,
-    ]
+    menus = [bpy.types.VIEW3D_MT_select_edit_mesh]
 
     samplecnt: bpy.props.IntProperty(
             name="Sample Count",
             description="",
-            default=1,
+            default=8,
     )
     dim: bpy.props.IntProperty(
             name="Resolution",
             description="",
             default=256,
     )
-    onsphere: bpy.props.BoolProperty(
-            name="Sample whole sphere",
+    dom: bpy.props.EnumProperty(
+            name="Domain",
             description="",
-            default=False,
+            items=(
+                ('SPHERE', "Sphere", ""),
+                ('HEMI', "Hemisphere", ""),
+            )
     )
+    _debug = False
 
     @classmethod
     def poll(cls, context):
-        a = context.mode == 'OBJECT'
-        b = context.object is not None
-        return a and b and context.object.type == 'MESH'
+        return context.mode == 'EDIT_MESH'
 
     def execute(self, context):
-        global shader
-        dim = self.dim
-        dimhalf = dim * .5
-        if not shader:
-            shader = read_shader("depthpass")
-        shader.bind()
-        offbuf = gpu.types.GPUOffScreen(dim, dim)
-
-        # Create batch
+        # Make sure active object comes first, so we can easily
+        # find its vertices later
         ob = context.object
         obs = [ob]
-        for o in context.selected_editable_objects:
-            if o.type == 'MESH' and o is not ob:
+        for o in context.objects_in_mode:
+            if o is not ob:
                 obs.append(o)
+
+        # Mesh can't be updated in edit mode
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        # Initialize some stuff
+        dim = self.dim
+        dimhalf = dim * .5
+        offbuf = gpu.types.GPUOffScreen(dim, dim)
+        sample = sample_sphere if self.dom == 'SPHERE' \
+            else sample_hemisphere
+
+        # Construct depthpass shader
+        shader = gpu.types.GPUShader(
+            vertexcode='''
+            uniform mat4 mvp;
+            in vec3 pos;
+            void main() {
+                gl_Position = mvp * vec4(pos, 1);
+            }''',
+            fragcode='''
+            void main() {
+                float v = gl_FragCoord.z;
+                gl_FragColor = vec4(v, v, v, 1);
+            }'''
+        )
+        shader.bind()
+
+        # Create batch from all objects in edit mode
         verts, indcs, info = get_combined_geo(obs)
         batch = batch_for_shader(
             shader, 'TRIS',
             {"pos": verts},
             indices=indcs,
         )
+        batch.program_set(shader)
 
-        bounds, center = get_bounds_and_center(verts)
+        # Find the center and bounds of all objects to calculate the
+        # encompassing radius of the (hemi-)sphere on which render
+        # positions will be sampled
+        bounds, centr = get_bounds_and_center(verts)
         rad = np.linalg.norm(bounds[:2]) * .5 + 1
-        # bpy.ops.mesh.primitive_circle_add(location=center, radius=rad)
+
+        # Spawn debug sphere with calculated radius
+        if self._debug:
+            bpy.ops.mesh.primitive_uv_sphere_add(
+                radius=rad,
+                location=centr,
+                )
 
         # Isolate active objects' vertices
         verts = verts[:info[0][0]]
-        del indcs, info
+        del obs, indcs, info, bounds
 
-        # Generate random points on a hemisphere
-        for i in range(self.samplecnt):
-            x, y, z, phi, theta = sample_hemisphere(rad)
-            transf = make_transf_mat((x, y, z), (theta, 0, phi + np.pi * .5))
+        # Render the objects from several views and mark seen vertices
+        visibl = np.zeros(len(verts), dtype=np.bool)
+        for _ in range(self.samplecnt):
+            # Generate random points on the chosen domain from which
+            # to render the objects
+            # Chose rotation so the 'camera' looks to the center
+            samplepos, (theta, phi) = sample(rad)
+            view_mat_inv = make_transf_mat(
+                transl=samplepos + centr,
+                rot=(phi, 0, theta + np.pi * .5),
+                )
 
-            # bpy.ops.object.camera_add()
-            # bpy.context.object.matrix_world = Matrix(transf)
+            # Spawn debug camera at sampled position
+            if self._debug:
+                bpy.ops.object.camera_add()
+                bpy.context.object.matrix_world = Matrix(view_mat_inv)
 
+            # Build the Model View Projection matrix from chosen
+            # render position and radius
+            # The model matrix has already been applied to the vertices
+            # befor creating the batch
             mvp = make_proj_mat(
                 fov=90,
                 clip_start=rad * .33,
                 clip_end=rad * 1.5,
                 dimx=dim,
                 dimy=dim,
-                ) @ np.linalg.inv(transf)
+                ) @ np.linalg.inv(view_mat_inv)
             shader.uniform_float("mvp", Matrix(mvp))
-            del transf, x, y, z, phi, theta
+            del view_mat_inv, samplepos, theta, phi
 
             with offbuf.bind():
+                # Render the selected objects into the offscreen buffer
                 bgl.glClearColor(1, 1, 1, 0)
                 bgl.glClear(bgl.GL_COLOR_BUFFER_BIT |
                             bgl.GL_DEPTH_BUFFER_BIT)
                 bgl.glEnable(bgl.GL_DEPTH_TEST)
-                batch.draw(shader)
+                batch.draw()
 
                 # Write texture back to CPU
                 pxbuf = bgl.Buffer(bgl.GL_BYTE, dim * dim)
                 bgl.glReadBuffer(bgl.GL_BACK)
                 bgl.glReadPixels(0, 0, dim, dim, bgl.GL_RED,
                                  bgl.GL_UNSIGNED_BYTE, pxbuf)
-                pxbuf = np.array(pxbuf) / 128 - 1
-                pxbuf.shape = (dim, dim)
+
+            # Map depth values from [0, 255] to [-1, 1]
+            pxbuf = np.asanyarray(pxbuf) / 128 - 1
+            pxbuf.shape = (dim, dim)
 
             # Transform verts of active object to clip space
-            vcs = transf_pts_unsliced(mvp, verts)
-            # Perspective divide to transform to NDC
-            vcs /= vcs[:, 3:]
+            tverts = mvp @ homog_vecs(verts).T
+            # Perspective divide to transform to NDCs [-1, 1]
+            tverts /= tverts[3]
 
-            # Remap from NDC to pixel coordinates, or in other words
-            # from [-1,1] to [0, dim]
+            # Find pixel coordinates of each vertex' projected position
+            # by remapping x and y coordinates from NDCs to [0, dim]
             # Add .5 to make sure the flooring from conversion to int
             # is actually rounding
-            uvs = vcs[:, :2] * dimhalf + (dimhalf + .5)
+            uvs = tverts[:2] * dimhalf + (dimhalf + .5)
             uvs = uvs.astype(np.int32)
-            invalid = np.any((uvs < 0) | (dim <= uvs), axis=1)
-            uvs[invalid] = (0, 0)
-            uvs = (uvs[:, 1:2], uvs[:, :1])
 
-            dpth_img = pxbuf[uvs].ravel()
-            dpth_verts = vcs[:, 2:3].ravel()
-            dpth_verts[invalid] = 2
-            sel = dpth_verts < (dpth_img - .001)
-            ob.data.vertices.foreach_set('select', sel)
+            # Map all vertices outside the view frustum to (0, 0)
+            # so they don't sample the pixel array out of bounds
+            invalid = np.any((uvs < 0) | (dim <= uvs), axis=0)
+            uvs.T[invalid] = (0, 0)
 
-            # pxbuf = np.repeat(pxbuf, 4)
-            # pxbuf.shape = (dim, dim, 4)
-            # pxbuf *= .5
-            # pxbuf += .5
-            # pxbuf[:, :, 3:] = 1
-            # pxbuf[uvs] = (1, 0, 0, 1)
-            # imgname = "Debug"
-            # if imgname not in bpy.data.images:
-            #     bpy.data.images.new(imgname, dim, dim)
-            # image = bpy.data.images[imgname]
-            # image.scale(dim, dim)
-            # image.pixels = pxbuf.ravel()
+            # For each vertex, get the depth at its projected pixel
+            # and its distance to the render position
+            imgdpth = pxbuf[(uvs[1], uvs[0])]
+            camdist = tverts[2]
+            # Set the distance of invalid vertices past [-1, 1] so they
+            # won't be selected
+            camdist[invalid] = 2
+
+            # A vertex is visible if it's inside the view frustum
+            # (valid) and not occluded by any face.
+            # A vertex is occluded when its depth sampled from the
+            # image is smaller than its distance to the camera.
+            # A small error margin is added to prevent self-occlusion.
+            # The result is logically or-ed with the result from other
+            # render positions.
+            visibl |= camdist <= (imgdpth + .001)
+
+            # Create debug image of the rendered view
+            if self._debug:
+                # Grayscale to RGBA and [-1, 1] to [0, 1]
+                pxbuf = np.repeat(pxbuf, 4) * .5 + .5
+                pxbuf.shape = (dim, dim, 4)
+                # Alpha channel is 1
+                pxbuf[:, :, 3] = 1
+                # Mark projected vertex positions in red
+                pxbuf[(uvs[1], uvs[0])] = (1, 0, 0, 1)
+
+                imgname = "Debug"
+                if imgname not in bpy.data.images:
+                    bpy.data.images.new(imgname, dim, dim)
+                image = bpy.data.images[imgname]
+                image.scale(dim, dim)
+                image.pixels = pxbuf.ravel()
 
         offbuf.free()
-        # context.view_layer.objects.active = ob
-        # bpy.ops.object.mode_set(mode='EDIT')
+        ob.data.vertices.foreach_set('select', visibl)
+        if self._debug:
+            # Unselect spawned camera
+            context.view_layer.objects.active = ob
+
+        bpy.ops.object.mode_set(mode='EDIT')
         return {'FINISHED'}

@@ -112,13 +112,22 @@ def get_shape_distrib(points, bincnt=32):
         )
 
 
-def sample_hemisphere(radius):
-    costheta = np.sqrt(random())
-    theta = np.arccos(costheta)
-    sintheta = radius * np.sin(theta)
-    phi = 2 * np.pi * random()
+def _sample_longitude(cosphi, radius):
+    phi = np.arccos(cosphi)
+    sinphi = radius * np.sin(phi)
+    theta = 2 * np.pi * random()
 
-    x = sintheta * np.cos(phi)
-    y = sintheta * np.sin(phi)
-    z = radius * costheta
-    return x, y, z, phi, theta
+    x = sinphi * np.cos(theta)
+    y = sinphi * np.sin(theta)
+    z = radius * cosphi
+    return (x, y, z), (theta, phi)
+
+
+def sample_hemisphere(radius):
+    cosphi = np.sqrt(random())
+    return _sample_longitude(cosphi, radius)
+
+
+def sample_sphere(radius):
+    cosphi = 2 * random() - 1
+    return _sample_longitude(cosphi, radius)
