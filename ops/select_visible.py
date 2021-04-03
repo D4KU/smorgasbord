@@ -7,7 +7,7 @@ from mathutils import Matrix
 from gpu_extras.batch import batch_for_shader
 
 from smorgasbord.common.decorate import register
-from smorgasbord.common.mesh_manip import get_combined_geo
+from smorgasbord.common.mesh_manip import combine_meshes
 from smorgasbord.common.sample import sample_sphere, sample_hemisphere
 from smorgasbord.common.transf import homog_vecs
 from smorgasbord.common.io import get_bounds_and_center
@@ -18,26 +18,44 @@ from smorgasbord.common.mat_manip import make_transf_mat, make_proj_mat
 class SelectVisible(bpy.types.Operator):
     bl_idname = "mesh.select_visible"
     bl_label = "Select Visible"
-    bl_description = ""
+    bl_description = (
+        "Renders edited objects from random positions around them and "
+        "selects vertices seen from any position, leaving occluded "
+        "vertices unselected"
+    )
     bl_options = {'REGISTER', 'UNDO'}
     menus = [bpy.types.VIEW3D_MT_select_edit_mesh]
 
     samplecnt: bpy.props.IntProperty(
             name="Sample Count",
-            description="",
+            description=(
+                "Number of times the objects are rendered from "
+                "different angles. Lower values decrease calculation "
+                "time, but increase the change that visible vertices "
+                "are missed"
+            ),
             default=8,
     )
     dim: bpy.props.IntProperty(
             name="Resolution",
-            description="",
+            description=(
+                "Pixel count of the rendered images along one axis. "
+                "Lower values decrease calculation time, but increase "
+                "the change that a vertex is declared occluded when it "
+                "barely peeks out behind an occluder"
+            ),
             default=256,
     )
     dom: bpy.props.EnumProperty(
             name="Domain",
-            description="",
+            description=(
+                "On which surface to sample the render positions. The "
+                "radius is chosen adaptively from the bounds of the "
+                "objects"
+            ),
             items=(
-                ('SPHERE', "Sphere", ""),
-                ('HEMI', "Hemisphere", ""),
+                ('SPHERE', "Sphere", "Also render from the bottom"),
+                ('HEMI', "Hemisphere", "Render only from above"),
             )
     )
     _debug = False
@@ -47,18 +65,19 @@ class SelectVisible(bpy.types.Operator):
         return context.mode == 'EDIT_MESH'
 
     def execute(self, context):
-        # Make sure active object comes first, so we can easily
-        # find its vertices later
-        ob = context.object
-        obs = [ob]
-        for o in context.objects_in_mode:
-            if o is not ob:
-                obs.append(o)
-
+        obs = context.objects_in_mode
         # Mesh can't be updated in edit mode
         bpy.ops.object.mode_set(mode='OBJECT')
+        try:
+            self._execute_inner(obs)
+        finally:
+            # Spawned debug camera overwrote selection
+            if not self._debug:
+                bpy.ops.object.mode_set(mode='EDIT')
 
-        # Initialize some stuff
+        return {'FINISHED'}
+
+    def _execute_inner(self, obs):
         dim = self.dim
         dimhalf = dim * .5
         offbuf = gpu.types.GPUOffScreen(dim, dim)
@@ -82,7 +101,7 @@ class SelectVisible(bpy.types.Operator):
         shader.bind()
 
         # Create batch from all objects in edit mode
-        verts, indcs, info = get_combined_geo(obs)
+        verts, indcs, geoinfo = combine_meshes(obs)
         batch = batch_for_shader(
             shader, 'TRIS',
             {"pos": verts},
@@ -95,6 +114,7 @@ class SelectVisible(bpy.types.Operator):
         # positions will be sampled
         bounds, centr = get_bounds_and_center(verts)
         rad = np.linalg.norm(bounds[:2]) * .5 + 1
+        del indcs, bounds
 
         # Spawn debug sphere with calculated radius
         if self._debug:
@@ -102,10 +122,6 @@ class SelectVisible(bpy.types.Operator):
                 radius=rad,
                 location=centr,
                 )
-
-        # Isolate active objects' vertices
-        verts = verts[:info[0][0]]
-        del obs, indcs, info, bounds
 
         # Render the objects from several views and mark seen vertices
         visibl = np.zeros(len(verts), dtype=np.bool)
@@ -207,11 +223,10 @@ class SelectVisible(bpy.types.Operator):
                 image.scale(dim, dim)
                 image.pixels = pxbuf.ravel()
 
+        # Split visible flag list back in original objects
         offbuf.free()
-        ob.data.vertices.foreach_set('select', visibl)
-        if self._debug:
-            # Unselect spawned camera
-            context.view_layer.objects.active = ob
-
-        bpy.ops.object.mode_set(mode='EDIT')
-        return {'FINISHED'}
+        start = 0
+        for o, (voff, _) in zip(obs, geoinfo):
+            end = start + voff
+            o.data.vertices.foreach_set('select', visibl[start:end])
+            start += end

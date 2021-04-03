@@ -9,7 +9,7 @@ from smorgasbord.common.mat_manip import make_transf_mat
 from smorgasbord.common.transf import transf_vecs
 
 
-def get_combined_geo(obs):
+def combine_meshes(obs):
     vtotlen = 0
     itotlen = 0
     info = []
