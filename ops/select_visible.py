@@ -58,7 +58,9 @@ class SelectVisible(bpy.types.Operator):
                 ('HEMI', "Hemisphere", "Render only from above"),
             )
     )
-    _debug = False
+    _debug_create_img = False
+    _debug_spawn_cams = False
+    _debug_spawn_sphere = False
 
     @classmethod
     def poll(cls, context):
@@ -71,8 +73,7 @@ class SelectVisible(bpy.types.Operator):
         try:
             self._execute_inner(obs)
         finally:
-            # Spawned debug camera overwrote selection
-            if not self._debug:
+            if not (self._debug_spawn_cams or self._debug_spawn_sphere):
                 bpy.ops.object.mode_set(mode='EDIT')
 
         return {'FINISHED'}
@@ -117,7 +118,7 @@ class SelectVisible(bpy.types.Operator):
         del indcs, bounds
 
         # Spawn debug sphere with calculated radius
-        if self._debug:
+        if self._debug_spawn_sphere:
             bpy.ops.mesh.primitive_uv_sphere_add(
                 radius=rad,
                 location=centr,
@@ -136,7 +137,7 @@ class SelectVisible(bpy.types.Operator):
                 )
 
             # Spawn debug camera at sampled position
-            if self._debug:
+            if self._debug_spawn_cams:
                 bpy.ops.object.camera_add()
                 bpy.context.object.matrix_world = Matrix(view_mat_inv)
 
@@ -156,6 +157,7 @@ class SelectVisible(bpy.types.Operator):
 
             with offbuf.bind():
                 # Render the selected objects into the offscreen buffer
+                bgl.glDepthMask(bgl.GL_TRUE)
                 bgl.glClearColor(1, 1, 1, 0)
                 bgl.glClear(bgl.GL_COLOR_BUFFER_BIT |
                             bgl.GL_DEPTH_BUFFER_BIT)
@@ -207,7 +209,7 @@ class SelectVisible(bpy.types.Operator):
             visibl |= camdist <= (imgdpth + .001)
 
             # Create debug image of the rendered view
-            if self._debug:
+            if self._debug_create_img:
                 # Grayscale to RGBA and [-1, 1] to [0, 1]
                 pxbuf = np.repeat(pxbuf, 4) * .5 + .5
                 pxbuf.shape = (dim, dim, 4)
