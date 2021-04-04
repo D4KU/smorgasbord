@@ -76,6 +76,13 @@ class SelectVisible(bpy.types.Operator):
             if not (self._debug_spawn_cams or self._debug_spawn_sphere):
                 bpy.ops.object.mode_set(mode='EDIT')
 
+        # because only vertices are updated, ensure selection is also
+        # seen in edge and face mode
+        sel_mode = context.tool_settings.mesh_select_mode
+        if sel_mode[1] or sel_mode[2]:
+            bpy.ops.mesh.select_mode(use_extend=True, type='VERT')
+            bpy.ops.mesh.select_mode(use_extend=True, type='VERT')
+
         return {'FINISHED'}
 
     def _execute_inner(self, obs):
@@ -228,7 +235,6 @@ class SelectVisible(bpy.types.Operator):
         # Split visible flag list back in original objects
         offbuf.free()
         start = 0
-        for o, (voff, _) in zip(obs, geoinfo):
-            end = start + voff
+        for o, (end, _) in zip(obs, geoinfo):
             o.data.vertices.foreach_set('select', visibl[start:end])
-            start += end
+            start = end

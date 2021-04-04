@@ -11,20 +11,21 @@ high-polygonal meshes. It is also under development, so beware of bugs!
 2.2 [Align Bounds](#align-bounds)  
 2.3 [Select Loose by Size](#select-loose-by-size)  
 2.4 [Select Similar](#select-similar)  
-2.5 [Transfer Materials](#transfer-materials)  
-2.6 [Select Concave Parts](#select-concave-partsselect-concave-parts)  
-2.7 [Lerp Weights](#lerp-weights)  
-2.8 [Set Parent Advanced](#set-parent-advanced)  
-2.9 [Apply Name](#apply-name)  
-2.10 [Select All by Name](#select-all-byname)  
-2.11 [Replace Duplicate Materials](#replace-duplicate-materials)  
-2.12 [Prepare Export to Unity](#prepare-export-to-unity)  
-2.13 [Vertex Color to Group](#vertex-color-to-group)  
-2.14 [Remove Empty Vertex Groups](#remove-empty-vertex-groups)  
-2.15 [Remove Similar UV Maps](#remove-similar-uv-maps)  
-2.16 [Force Apply Transform](#force-apply-transform)  
-2.17 [Force Apply Modifier](#force-apply-modifier)  
-2.18 [Select N Instances](#select-n-instances)  
+2.5 [Select Visible](#select-visible)  
+2.6 [Transfer Materials](#transfer-materials)  
+2.7 [Select Concave Parts](#select-concave-partsselect-concave-parts)  
+2.8 [Lerp Weights](#lerp-weights)  
+2.9 [Set Parent Advanced](#set-parent-advanced)  
+2.10 [Apply Name](#apply-name)  
+2.11 [Select All by Name](#select-all-byname)  
+2.12 [Replace Duplicate Materials](#replace-duplicate-materials)  
+2.13 [Prepare Export to Unity](#prepare-export-to-unity)  
+2.14 [Vertex Color to Group](#vertex-color-to-group)  
+2.15 [Remove Empty Vertex Groups](#remove-empty-vertex-groups)  
+2.16 [Remove Similar UV Maps](#remove-similar-uv-maps)  
+2.17 [Force Apply Transform](#force-apply-transform)  
+2.18 [Force Apply Modifier](#force-apply-modifier)  
+2.19 [Select N Instances](#select-n-instances)  
 
 
 # Installation
@@ -90,6 +91,7 @@ a given maximum threshold.
 
 ![](https://github.com/D4KU/smorgasbord/blob/master/media/SelectLooseBySize.gif)
 
+
 ### Select Similar
 
 `[Object mode] Select > Select Similar`
@@ -102,6 +104,20 @@ Machine Learning, so similarities between strongly deformed or complex objects
 can't be reliably detected.
 
 ![](https://github.com/D4KU/smorgasbord/blob/master/media/SelectSimilar.gif)
+
+
+### Select Visible
+
+`[Edit mode] Select > Select Visible`
+
+Renders edited objects from random positions around them and selects vertices
+seen from any of those positions, leaving occluded vertices unselected. This
+is useful to remove hidden inside parts of a CAD model, for example. A good
+workflow following this function is to select linked vertices (Ctrl-L) to
+catch the ones this operator missed, and then to invert the selection. This is
+shown in the animation below.
+
+![](https://github.com/D4KU/smorgasbord/blob/master/media/SelectVisible.gif)
 
 
 ### Transfer Materials
