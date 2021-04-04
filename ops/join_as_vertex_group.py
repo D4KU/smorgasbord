@@ -1,7 +1,4 @@
-import bmesh as bm
 import bpy
-import mathutils as mu
-
 from smorgasbord.common.decorate import register
 
 
@@ -26,7 +23,9 @@ class JoinAsVertexGroup(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'OBJECT' and context.object
+        a = context.mode == 'OBJECT'
+        b = context.object is not None
+        return a and b and context.object.type == 'MESH'
 
     def execute(self, context):
         for o in context.selected_editable_objects:
