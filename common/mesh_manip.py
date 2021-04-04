@@ -10,9 +10,31 @@ from smorgasbord.common.transf import transf_pts
 
 
 def combine_meshes(obs):
+    """
+    Returns the meshes of all passed objects combined.
+
+    Parameters
+    ----------
+    obs : Iterable[bpy_types.Object]
+        Objects to combine. Fails if non-mesh object is passed.
+
+    Returns
+    -------
+    verts : numpy.ndarray
+        Nx3 float array of XYZ vertex coordinates in world space
+    indcs : numpy.ndarray
+        Nx3 int array of triangle indices
+    info : list[tuple]
+        Holds a tuple for each passed object. The first entry stores
+        the index of the first element in 'verts' belonging to the
+        corresponding object, the second entry the same for 'indcs'.
+    """
     vtotlen = 0
     itotlen = 0
     info = []
+
+    # Accumulate vertex and triangle counts of all passed objects to
+    # later allocate the right amount of memory
     for o in obs:
         mesh = o.data
         mesh.calc_loop_triangles()
@@ -20,27 +42,33 @@ def combine_meshes(obs):
         itotlen += len(mesh.loop_triangles)
         info.append((vtotlen, itotlen))
 
+    # Initialize joined lists
     verts = np.empty(vtotlen * 3, dtype=np.float32)
     indcs = np.empty(itotlen * 3, dtype=np.int32)
     vstart = 0
     istart = 0
 
     for o in obs:
+        # Calculate current object's slice in combined list
         mesh = o.data
         vend = vstart + len(mesh.vertices) * 3
         iend = istart + len(mesh.loop_triangles) * 3
         vslice = verts[vstart:vend]
         islice = indcs[istart:iend]
 
-        # Vertices
+        # Get vertex coordinates of current object
         mesh.vertices.foreach_get('co', vslice)
+        # Transform vertices to world space
         verts[vstart:vend] = transf_pts(
             o.matrix_world,
             vslice.reshape(-1, 3),
             ).ravel()
 
-        # Indices
+        # Get triangle indices of current object
         mesh.loop_triangles.foreach_get('vertices', islice)
+        # Offset each new index by the vertex count already in the
+        # joined list so that the indices still point to the correct
+        # vertex coordinates.
         islice += int(vstart / 3)
 
         vstart = vend

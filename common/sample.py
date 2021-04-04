@@ -113,6 +113,9 @@ def get_shape_distrib(points, bincnt=32):
 
 
 def _sample_longitude(cosphi, radius):
+    """
+    Common code of (hemi-)sphere sampling
+    """
     phi = np.arccos(cosphi)
     sinphi = radius * np.sin(phi)
     theta = 2 * np.pi * random()
@@ -124,10 +127,40 @@ def _sample_longitude(cosphi, radius):
 
 
 def sample_hemisphere(radius):
+    """
+    Sample a random point on a upwards-oriented hemisphere.
+
+    Parameters
+    ----------
+    radius : number
+        Radius of the hemisphere
+
+    Returns
+    -------
+    out : tuple[tuple]
+        First element is a tuple with XYZ coordinates of the sampled
+        point. Second element is a tuple with the polar coordinates
+        (theta, phi) of the same point.
+    """
     cosphi = np.sqrt(random())
     return _sample_longitude(cosphi, radius)
 
 
 def sample_sphere(radius):
+    """
+    Sample a random point on a sphere
+
+    Parameters
+    ----------
+    radius : number
+        Radius of the sphere
+
+    Returns
+    -------
+    out : tuple[tuple]
+        First element is a tuple with XYZ coordinates of the sampled
+        point. Second element is a tuple with the polar coordinates
+        (theta, phi) of the same point.
+    """
     cosphi = 2 * random() - 1
     return _sample_longitude(cosphi, radius)

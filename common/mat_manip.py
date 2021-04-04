@@ -127,12 +127,34 @@ def append_row_and_col(mat):
 
 def make_proj_mat(
         fov=50,
-        ortho=False,
         clip_start=.1,
         clip_end=1000,
         dimx=512,
         dimy=512,
         ):
+    """
+    Create a projection matrix
+
+    Parameters
+    ----------
+    fov : number
+        Field of view in degrees. Pass float('inf') to make the matrix
+        orthographic.
+    clip_start : number
+        Depth of near clipping plane
+    clip_end : number
+        Depth of far clipping plane
+    dimx : number
+        Horizontal pixel count
+    dimy : number
+        Vertical pixel count
+
+    Returns
+    -------
+    mat : numpy.ndarray
+        4x4 matrix
+    """
+    ortho = fov is float('inf')
     right = 0 if ortho else clip_start * np.tan(np.radians(fov) * .5)
     left = -right
     top = right * (dimy / dimx)
