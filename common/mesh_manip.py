@@ -6,7 +6,7 @@ import numpy as np
 
 from smorgasbord.common.io import get_scalars
 from smorgasbord.common.mat_manip import make_transf_mat
-from smorgasbord.common.transf import transf_vecs
+from smorgasbord.common.transf import transf_pts
 
 
 def combine_meshes(obs):
@@ -34,7 +34,7 @@ def combine_meshes(obs):
 
         # Vertices
         mesh.vertices.foreach_get('co', vslice)
-        verts[vstart:vend] = transf_vecs(
+        verts[vstart:vend] = transf_pts(
             o.matrix_world,
             vslice.reshape(-1, 3),
             ).ravel()
@@ -202,7 +202,7 @@ def add_box_to_obj(
     # local space
     mat = np.array(ob.matrix_world.inverted()) @ \
         make_transf_mat(location, rotation, size)
-    verts = transf_vecs(mat, verts)
+    verts = transf_pts(mat, verts)
 
     add_geom_to_bmesh(bob, verts, faces, select)
     bm.update_edit_mesh(ob.data)

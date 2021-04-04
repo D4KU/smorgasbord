@@ -2,7 +2,7 @@ import bpy
 import numpy as np
 
 from smorgasbord.common.io import get_scalars, get_vecs
-from smorgasbord.common.transf import transf_vecs, transf_point
+from smorgasbord.common.transf import transf_pts, transf_point
 from smorgasbord.common.decorate import register
 
 
@@ -96,7 +96,7 @@ class LerpWeight(bpy.types.Operator):
             pts = get_vecs(verts)[selflags]
 
             # Also transform vertices into the world system
-            pts = transf_vecs(o.matrix_world, pts)
+            pts = transf_pts(o.matrix_world, pts)
             # Calc vector from bone1 to every point and zero coordinates
             # of dimensions that are ignored.
             b1pts = (pts - b1) * dims

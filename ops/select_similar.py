@@ -3,7 +3,7 @@ from math import ceil, sqrt
 import numpy as np
 
 from smorgasbord.common.io import get_bounds_and_center
-from smorgasbord.common.transf import transf_vecs
+from smorgasbord.common.transf import transf_pts
 from smorgasbord.common.decorate import register
 from smorgasbord.common.draw import draw_points, View3DDrawer
 from smorgasbord.common.sample import sample_mesh, get_shape_distrib
@@ -132,7 +132,7 @@ class SelectSimilar(bpy.types.Operator):
         points = sample_mesh(ob.data, self._samplcnt)
 
         # Draw samples
-        points = transf_vecs(ob.matrix_world, points)
+        points = transf_pts(ob.matrix_world, points)
         if self.draw_sampls:
             drawer = View3DDrawer(draw_points)
             self._gl_handls.append(drawer)

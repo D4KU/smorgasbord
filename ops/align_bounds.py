@@ -99,7 +99,7 @@ class AlignBounds(bpy.types.Operator):
         if self.axes_align:
             # If we align sources to world axes, we are interested in
             # the target bounds in world coordinates.
-            tcoords = sbt.transf_vecs(tworldmat, tcoords)
+            tcoords = sbt.transf_pts(tworldmat, tcoords)
             # If we align sources to axes, we ignore target's rotation.
             trotmat = np.identity(3)
 
@@ -169,7 +169,7 @@ class AlignBounds(bpy.types.Operator):
                 # update every selected vertex with transformed
                 # coordinates
                 sverts_all[sselflags] = \
-                    sbt.transf_vecs(transf_mat, sverts_sel)
+                    sbt.transf_pts(transf_mat, sverts_sel)
                 # overwrite complete vertex list (also non-selected)
                 sbio.set_vals(sverts, sverts_all)
                 bpy.ops.object.mode_set(mode='EDIT')

@@ -19,39 +19,32 @@ def normalize(v):
     return v if l == 0 else v / l
 
 
-def homog_vecs(vecs):
+def append_one(pts):
     """
-    Transform a vector list from Cartesian into homogeneous coordinates
-    by adding a coordinate equal to one to every vector.
+    Append a coordinate equal to one to every vector.
 
     Parameters
     ----------
-    vecs : Iterable
-        Vector list to homogenize.
+    pts : Iterable
+        Points to append to.
 
     Returns
     -------
-    hvecs : numpy.ndarray
-        Copy of 'vecs' with homogenized coordinates.
+    hpts : numpy.ndarray
+        Copy of 'pts' with appended coordinates
 
     Examples
     --------
-    >>> homog_vecs([[0, 1, 2], [3, 4, 5]])
+    >>> append_one([[0, 1, 2], [3, 4, 5]])
     array([[0, 1, 2, 1], [3, 4, 5, 1]])
     """
-    vs = np.asanyarray(vecs)
-    hvecs = np.ones(np.add(vs.shape, (0, 1)), dtype=vs.dtype)
-    hvecs[:, :-1] = vs
-    return hvecs
+    vs = np.asanyarray(pts)
+    hpts = np.ones(np.add(vs.shape, (0, 1)), dtype=vs.dtype)
+    hpts[:, :-1] = vs
+    return hpts
 
 
-def transf_pts_unsliced(mat, pts):
-    # blender.stackexchange.com/a/139513
-    # return np.einsum('ij,aj->ai', mat, homog_vecs(pts))[:, :-1]
-    return (np.asanyarray(mat) @ homog_vecs(pts).T).T
-
-
-def transf_vecs(mat, pts):
+def transf_pts(mat, pts):
     """
     Apply a transformation matrix to every point in a list.
 
@@ -67,7 +60,9 @@ def transf_vecs(mat, pts):
     pts : numpy.ndarray
         Copy of 'pts' with transformed coordinates
     """
-    return transf_pts_unsliced(mat, pts)[:, :3]
+    # blender.stackexchange.com/a/139513
+    # return np.einsum('ij,aj->ai', mat, homog_vecs(pts))[:, :-1]
+    return (np.asanyarray(mat) @ append_one(pts).T).T[:, :3]
 
 
 def transf_point(mat, point):

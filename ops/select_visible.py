@@ -9,7 +9,7 @@ from gpu_extras.batch import batch_for_shader
 from smorgasbord.common.decorate import register
 from smorgasbord.common.mesh_manip import combine_meshes
 from smorgasbord.common.sample import sample_sphere, sample_hemisphere
-from smorgasbord.common.transf import homog_vecs
+from smorgasbord.common.transf import append_one
 from smorgasbord.common.io import get_bounds_and_center
 from smorgasbord.common.mat_manip import make_transf_mat, make_proj_mat
 
@@ -175,7 +175,7 @@ class SelectVisible(bpy.types.Operator):
             pxbuf.shape = (dim, dim)
 
             # Transform verts of active object to clip space
-            tverts = mvp @ homog_vecs(verts).T
+            tverts = mvp @ append_one(verts).T
             # Perspective divide to transform to NDCs [-1, 1]
             tverts /= tverts[3]
 

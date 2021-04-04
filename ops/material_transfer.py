@@ -4,7 +4,7 @@ import numpy as np
 
 from smorgasbord.common.decorate import register
 from smorgasbord.common.io import get_vecs, get_scalars, set_vals
-from smorgasbord.common.transf import transf_vecs
+from smorgasbord.common.transf import transf_pts
 
 
 @register
@@ -58,7 +58,7 @@ class MaterialTransfer(bpy.types.Operator):
         if self.in_wrld_crds:
             # transform source to world coordinates
             mat = np.array(source.matrix_world)
-            scvals = transf_vecs(mat, scvals)
+            scvals = transf_pts(mat, scvals)
 
         # build KD-Tree from comparison values
         kd = KDTree(len(sgeom))
@@ -87,7 +87,7 @@ class MaterialTransfer(bpy.types.Operator):
             if self.in_wrld_crds:
                 # transform target to world coordinates
                 mat = np.array(target.matrix_world)
-                tcvals = transf_vecs(mat, tcvals)
+                tcvals = transf_pts(mat, tcvals)
                 ttvals = np.empty(len(tgeom), dtype=np.int32)
 
             # for every comparison point in target, find closest in

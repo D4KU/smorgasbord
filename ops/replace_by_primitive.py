@@ -111,7 +111,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
         if self.align_to_axes:
             # If we align sources to world axes, we are interested in
             # the bounds in world coordinates.
-            verts = sbt.transf_vecs(mat_wrld, verts)
+            verts = sbt.transf_pts(mat_wrld, verts)
             # If we align sources to axes, we ignore ob's rotation.
             rotation = Euler()
 
@@ -215,7 +215,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
 
                 if o is not ob:
                     mat = mat_wrld_inv @ np.array(o.matrix_world)
-                    ocoords = sbt.transf_vecs(mat, ocoords)
+                    ocoords = sbt.transf_pts(mat, ocoords)
 
                 coords = np.concatenate((coords, ocoords))
 
@@ -300,7 +300,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
                 # object
                 if o is not ob:
                     mat = mat_wrld_inv @ np.array(o.matrix_world)
-                    verts_o = sbt.transf_vecs(mat, verts_o)
+                    verts_o = sbt.transf_pts(mat, verts_o)
 
                 verts = np.concatenate((verts, verts_o))
 
