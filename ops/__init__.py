@@ -7,6 +7,7 @@ from smorgasbord.ops import (
     join_as_vertex_group,
     lerp_weight,
     material_transfer,
+    offset_selection,
     prepare_export_to_unity,
     prepend_name_to_children,
     quick_fix_objects,

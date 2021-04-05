@@ -32,7 +32,7 @@ class RemoveEmptyVertexGroups(bpy.types.Operator):
     limit_to_arms: bpy.props.BoolProperty(
         name="Limit to armatures",
         description="Only keep vertex groups linked to an armature",
-        default=True,
+        default=False,
     )
 
     @classmethod
