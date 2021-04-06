@@ -11,7 +11,11 @@ class ForceJoin(bpy.types.Operator):
         "mesh objects instead of ignoring them"
     )
     bl_options = {'REGISTER', 'UNDO'}
-    menus = [bpy.types.OUTLINER_MT_context]
+    try:
+        menus = [bpy.types.OUTLINER_MT_object]
+    except AttributeError:
+        # type got renamed somewhere before Blender 2.92
+        menus = [bpy.types.OUTLINER_MT_context]
 
     @classmethod
     def poll(cls, context):

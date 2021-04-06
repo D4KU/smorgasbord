@@ -8,7 +8,11 @@ class OffsetSelection(bpy.types.Operator):
     bl_label = "Offset Selection"
     bl_description = "Offset each selection by N entries up or down"
     bl_options = {'REGISTER', 'UNDO'}
-    menus = [bpy.types.OUTLINER_MT_context]
+    try:
+        menus = [bpy.types.OUTLINER_MT_object]
+    except AttributeError:
+        # type got renamed somewhere before Blender 2.92
+        menus = [bpy.types.OUTLINER_MT_context]
 
     step: bpy.props.IntProperty(
         name="Step",
@@ -22,10 +26,6 @@ class OffsetSelection(bpy.types.Operator):
         description="If true, offset active object state",
         default=True,
     )
-
-    @classmethod
-    def poll(cls, context):
-        return context.mode == 'OBJECT'
 
     def execute(self, context):
         obs = sorted(context.view_layer.objects, key=lambda o: o.name)
