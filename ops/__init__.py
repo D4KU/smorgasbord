@@ -13,6 +13,7 @@ from smorgasbord.ops import (
     quick_fix_objects,
     remove_similar_uv_maps,
     remove_empty_vertex_groups,
+    rename_vertex_groups,
     replace_by_primitive,
     replace_duplicate_materials,
     select_by_name,
