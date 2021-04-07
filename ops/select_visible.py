@@ -34,7 +34,7 @@ class SelectVisible(bpy.types.Operator):
                 "time, but increase the change that visible vertices "
                 "are missed"
             ),
-            default=8,
+            default=16,
     )
     dim: bpy.props.IntProperty(
             name="Resolution",
@@ -44,7 +44,7 @@ class SelectVisible(bpy.types.Operator):
                 "the change that a vertex is declared occluded when it "
                 "barely peeks out behind an occluder"
             ),
-            default=256,
+            default=128,
     )
     dom: bpy.props.EnumProperty(
             name="Domain",
@@ -102,8 +102,7 @@ class SelectVisible(bpy.types.Operator):
             }''',
             fragcode='''
             void main() {
-                float v = gl_FragCoord.z;
-                gl_FragColor = vec4(v, v, v, 1);
+                gl_FragColor = vec4(0, 0, 1, 1);
             }'''
         )
         shader.bind()
@@ -154,7 +153,7 @@ class SelectVisible(bpy.types.Operator):
             # befor creating the batch
             mvp = make_proj_mat(
                 fov=90,
-                clip_start=rad * .33,
+                clip_start=rad * .25,
                 clip_end=rad * 1.5,
                 dimx=dim,
                 dimy=dim,
@@ -165,20 +164,18 @@ class SelectVisible(bpy.types.Operator):
             with offbuf.bind():
                 # Render the selected objects into the offscreen buffer
                 bgl.glDepthMask(bgl.GL_TRUE)
-                bgl.glClearColor(1, 1, 1, 0)
-                bgl.glClear(bgl.GL_COLOR_BUFFER_BIT |
-                            bgl.GL_DEPTH_BUFFER_BIT)
+                bgl.glClear(bgl.GL_DEPTH_BUFFER_BIT)
                 bgl.glEnable(bgl.GL_DEPTH_TEST)
                 batch.draw()
 
                 # Write texture back to CPU
-                pxbuf = bgl.Buffer(bgl.GL_BYTE, dim * dim)
+                pxbuf = bgl.Buffer(bgl.GL_FLOAT, dim * dim)
                 bgl.glReadBuffer(bgl.GL_BACK)
-                bgl.glReadPixels(0, 0, dim, dim, bgl.GL_RED,
-                                 bgl.GL_UNSIGNED_BYTE, pxbuf)
+                bgl.glReadPixels(0, 0, dim, dim, bgl.GL_DEPTH_COMPONENT,
+                                 bgl.GL_FLOAT, pxbuf)
 
-            # Map depth values from [0, 255] to [-1, 1]
-            pxbuf = np.asanyarray(pxbuf) / 128 - 1
+            # Map depth values from [0, 1] to [-1, 1]
+            pxbuf = np.asanyarray(pxbuf) * 2 - 1
             pxbuf.shape = (dim, dim)
 
             # Transform verts of active object to clip space
