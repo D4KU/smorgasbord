@@ -19,19 +19,29 @@ class ForceJoin(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'OBJECT' and context.object
+        a = context.mode == 'OBJECT'
+        b = context.object
+        c = len(context.selected_editable_objects) > 1
+        return a and b and c
 
     def execute(self, context):
         ob = context.object
         mob = None  # some mesh object
         nmobs = []  # non-mesh objects
+        active_is_selected = False
 
         # Find all selected non-mesh objects and some mesh object
         for o in context.selected_editable_objects:
+            if o is ob:
+                active_is_selected = True
             if o.type == 'MESH':
                 mob = o
             else:
                 nmobs.append(o)
+
+        if not active_is_selected:
+            self.report({'WARNING'}, "Active object is not selected")
+            return {'CANCELLED'}
 
         if mob:
             if ob.type != 'MESH':
