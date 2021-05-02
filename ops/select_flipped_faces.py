@@ -2,10 +2,7 @@ import bpy
 from mathutils import Vector
 import numpy as np
 from smorgasbord.common.decorate import register
-from smorgasbord.common.io import (
-    get_vecs,
-    set_vals,
-)
+from smorgasbord.common.io import get_vecs
 
 
 @register

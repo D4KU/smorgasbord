@@ -29,18 +29,18 @@ class SelectByName(bpy.types.Operator):
 
     def execute(self, context):
         if self.match_metric == 'CONTAINS':
-            compare = lambda a, b: b in a
+            def f(a, b): return b in a
         elif self.match_metric == 'EQUALS':
-            compare = lambda a, b: a == b
+            def f(a, b): return a == b
         elif self.match_metric == 'STARTS_WITH':
-            compare = lambda a, b: a.startswith(b)
+            def f(a, b): return a.startswith(b)
         elif self.match_metric == 'ENDS_WITH':
-            compare = lambda a, b: a.endswith(b)
+            def f(a, b): return a.endswith(b)
         else:
-            compare = lambda a, b: re.fullmatch(b, a)
+            def f(a, b): return re.fullmatch(b, a)
 
         for o in context.view_layer.objects:
-            if compare(o.name, self.name):
+            if f(o.name, self.name):
                 o.select_set(True)
 
         return {'FINISHED'}

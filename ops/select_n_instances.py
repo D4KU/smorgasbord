@@ -61,7 +61,7 @@ class SelectNInstances(bpy.types.Operator):
         # The dict is initialized with all datas of relevance
         dataToObs = dict.fromkeys(datas, [])
         datas.clear()
-        for o in context.collection.objects:
+        for o in context.view_layer.objects:
             try:
                 dataToObs[o.data].append(o)
             except KeyError:
