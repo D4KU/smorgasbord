@@ -4,9 +4,9 @@ from smorgasbord.common.decorate import register
 
 
 @register
-class QuickFixObjects(bpy.types.Operator):
-    bl_idname = "object.quick_fix_objects"
-    bl_label = "Quick Fix Objects"
+class QuickFixShading(bpy.types.Operator):
+    bl_idname = "object.quick_fix_shading"
+    bl_label = "Quick Fix Shading"
     bl_description = (
         "For every selected object, set auto smooth and add Weighted "
         "Normal modifier."
