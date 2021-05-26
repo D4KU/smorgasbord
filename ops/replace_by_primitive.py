@@ -81,7 +81,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
         name="Delete Original",
         description="Delete selected object/vertices after operation "
         "finished",
-        default=False,
+        default=True,
     )
 
     @classmethod
@@ -100,11 +100,6 @@ class ReplaceByPrimitive(bpy.types.Operator):
             return cls.bl_description
 
     def _core(self, context, ob, verts, to_del=[]):
-        if len(verts) < 2:
-            self.report({'ERROR_INVALID_INPUT'},
-                        "Select at least 2 vertices")
-            return
-
         mat_wrld = np.array(ob.matrix_world)
         in_editmode = context.mode == 'EDIT_MESH'
 
@@ -198,6 +193,7 @@ class ReplaceByPrimitive(bpy.types.Operator):
 
     def _exec_obj_mode(self, context):
         all_type_err = True  # no obj is of type mesh
+        vert_count_err = False  # less than 2 vertices selected
 
         if self.join_select:
             coords = np.empty((0, 3), dtype=float)
@@ -219,7 +215,10 @@ class ReplaceByPrimitive(bpy.types.Operator):
 
                 coords = np.concatenate((coords, ocoords))
 
-            self._core(context, ob, coords, context.selected_objects)
+            if len(coords) > 1:
+                self._core(context, ob, coords, context.selected_objects)
+            else:
+                vert_count_err = True
         else:
             for o in context.selected_objects:
                 if o.type == 'MESH':
@@ -240,15 +239,20 @@ class ReplaceByPrimitive(bpy.types.Operator):
                     if self.align_to_axes and rot.dot(rot) > 0.001 \
                     else np.array(o.bound_box)
 
-                self._core(context, o, coords, [o])
+                if len(coords) > 1:
+                    self._core(context, o, coords, [o])
+                else:
+                    vert_count_err = True
 
+        if vert_count_err:
+            self.report({'ERROR_INVALID_INPUT'},
+                        "A selection must at least contain two vertices")
         if all_type_err:
             self.report({'ERROR_INVALID_INPUT'},
                         "An object must be of type mesh")
-            return {'CANCELLED'}
 
     def _exec_edit_mode(self, context):
-        sel_obs = context.selected_objects
+        sel_obs = context.objects_in_mode
 
         def wrap_core(core, ob, sel_flags):
             """
@@ -304,13 +308,24 @@ class ReplaceByPrimitive(bpy.types.Operator):
 
                 verts = np.concatenate((verts, verts_o))
 
-            core = partial(self._core, context, ob, verts, sel_obs)
-            wrap_core(core, ob, sel_flags)
+            if len(verts) > 1:
+                core = partial(self._core, context, ob, verts, sel_obs)
+                wrap_core(core, ob, sel_flags)
+            else:
+                self.report({'ERROR_INVALID_INPUT'},
+                            "Select at least two vertices")
         else:
+            vert_count_err = True
             for o in sel_obs:
                 verts, sel_flags = get_sel_verts(o)
-                core = partial(self._core, context, o, verts, [o])
-                wrap_core(core, o, sel_flags)
+                if len(verts) > 1:
+                    core = partial(self._core, context, o, verts, [o])
+                    wrap_core(core, o, sel_flags)
+                    vert_count_err = False
+
+            if vert_count_err:
+                self.report({'ERROR_INVALID_INPUT'},
+                    "Select at least two vertices in one object")
 
     def execute(self, context):
         if self.fit_metric == 'MIN':
@@ -326,7 +341,3 @@ class ReplaceByPrimitive(bpy.types.Operator):
             self._exec_obj_mode(context)
 
         return {'FINISHED'}
-
-
-if __name__ == "__main__":
-    register()
