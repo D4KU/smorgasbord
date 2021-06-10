@@ -30,17 +30,15 @@ high-polygonal meshes. It is also under development, so beware of bugs!
 
 # Installation
 
-Clone the repository to the **addons** directory in your script path with the
-command `git clone --recurse-submodules
-https://github.com/D4KU/smorgasbord.git`.  You can type
-`bpy.utils.script_path_user()` into Blender's Python Console to find the path.
-The existence of submodules makes it unfortunately not possible to obtain the
-add-on as zip download.
+The existence of submodules makes it unfortunately not possible to completely
+download the repository as a zip file. Do this instead:
 
-In Blender, navigate to `Edit > Preferences > Add-ons` and hit the **Install**
-button. Navigate to the cloned folder and select the *\_\_init__.py* file.
-Make sure to also tick the add-on in the list and save your preferences.
-Enjoy!
+* Navigate to Blender's *addons* directory. If you don't know the path, type
+`bpy.utils.user_resource('SCRIPTS', "addons")` into Blender's Python Console
+to see it.
+* Clone via `git clone --recurse-submodules https://github.com/D4KU/smorgasbord.git`
+
+* In Blender, navigate to `Edit > Preferences > Add-ons` and tick the add-on in the list.
 
 
 # Operators
