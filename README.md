@@ -37,8 +37,9 @@ download the repository as a zip file. Do this instead:
 `bpy.utils.user_resource('SCRIPTS', "addons")` into Blender's Python Console
 to see it.
 * Clone via `git clone --recurse-submodules https://github.com/D4KU/smorgasbord.git`
-
-* In Blender, navigate to `Edit > Preferences > Add-ons` and tick the add-on in the list.
+* In Blender, navigate to `Edit > Preferences > Add-ons`
+* Hit the *Refresh* button
+* Search for the add-on and tick it in the list.
 
 
 # Operators
