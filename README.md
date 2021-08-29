@@ -26,6 +26,7 @@ high-polygonal meshes. It is also under development, so beware of bugs!
 2.17 [Force Apply Transform](#force-apply-transform)  
 2.18 [Force Apply Modifier](#force-apply-modifier)  
 2.19 [Select N Instances](#select-n-instances)  
+2.20 [Viewport Display from Shader](#viewport-display-from-shader)
 
 
 # Installation
@@ -290,3 +291,12 @@ their occurrence in the scene hierarchy. A few examples:
 - from -1 to 0: select nothing (not supported)
 - from -1 to 3: likewise
 - from -2 to -1: select last instance
+
+### Viewport Display from Shader
+
+`Material Properties > Material Context Menu (v-shape under minus-sign)`
+
+For each active material of each selected object, search its node tree for a
+shader node and apply its properties to the material's viewport display
+properties. Optionally, do it the other way around: apply the viewport display
+properties to the shader node.

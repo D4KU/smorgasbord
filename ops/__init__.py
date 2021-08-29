@@ -27,6 +27,7 @@ for m in [
     ".set_parent_advanced",
     ".smart_parent_to_empty",
     ".vertex_color_to_group",
+    ".viewport_display_from_shader",
 ]:
     try:
         import_module(m, package=__name__)
