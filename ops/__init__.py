@@ -5,6 +5,7 @@ for m in [
     ".force_apply_modifier",
     ".force_apply_transform",
     ".force_join",
+    ".guess_rotation",
     ".join_as_vertex_group",
     ".lerp_weight",
     ".material_transfer",
