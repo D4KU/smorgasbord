@@ -29,6 +29,11 @@ class ForceApplyTransform(bpy.types.Operator):
         ),
         default='ALL',
     )
+    round_to: bpy.props.IntProperty(
+        name="Round to digits",
+        description="Round transform entries to this number of digits",
+        default=6,
+    )
     to_cursor: bpy.props.BoolProperty(
         name="To Cursor",
         description="Regard cursor as origin",
@@ -43,20 +48,14 @@ class ForceApplyTransform(bpy.types.Operator):
 
     def execute(self, context):
         ob = context.object
-        loc, rot, scl = ob.matrix_local.decompose()
 
-        # If no additional objects are selected in addition to the
-        # active one, consider all objects in the scene
-        selobs = context.selected_objects
-        if not selobs or selobs == [ob]:
-            selobs = context.scene.objects
-
+        # Build matrix to transform mesh data
         if self.apply_to == 'LOC':
-            tmat = Matrix.Translation(loc)
+            tmat = Matrix.Translation(ob.matrix_local.translation)
         elif self.apply_to == 'ROT':
-            tmat = rot.to_matrix().to_4x4()
+            tmat = ob.matrix_local.to_quaternion().to_matrix().to_4x4()
         elif self.apply_to == 'SCL':
-            tmat = Matrix.Diagonal(scl).to_4x4()
+            tmat = Matrix.Diagonal(ob.matrix_local.to_scale()).to_4x4()
         else:
             tmat = ob.matrix_local
 
@@ -66,25 +65,31 @@ class ForceApplyTransform(bpy.types.Operator):
         ob.data.transform(tmat)
         tmat_inv = tmat.inverted()
 
-        # Update ob's children to let them visually stay in place
-        for c in ob.children:
-            c.matrix_local = tmat @ c.matrix_local
+        # If no additional objects are selected in addition to the
+        # active one, consider all objects in the scene
+        selobs = context.selected_editable_objects
+        if selobs == [ob] or not selobs:
+            selobs = context.scene.objects
 
-        # Update objects sharing the same mesh as 'ob'
+        # Update instances (objects sharing the same mesh as 'ob'),
+        # including 'ob' itself
         for o in selobs:
             if o.data is not ob.data:
                 continue
 
-            # Check if an object is a child AND an instance of 'ob'.
-            # matrix_local seems to be updated only once per frame after
-            # execution of this script, so objects that are children and
-            # an instance, whose matrix has already been set in the first
-            # loop, still return their transformation from before the loop
-            # here
-            if ob is o.parent:
-                o.matrix_local = tmat @ o.matrix_local @ tmat_inv
+            # Update children of instances to let them visually stay in
+            # place
+            for child in o.children:
+                self._set_mat_local(child, tmat @ child.matrix_local)
+
+            # matrix_local is updated only after execution of this
+            # script, so objects still return their transformation from
+            # before the operator, even if it has been set before
+            if o.parent and o.parent.data is ob.data:
+                # 'o' is an instance AND child to an instance
+                self._set_mat_local(o, tmat @ o.matrix_local @ tmat_inv)
             else:
-                o.matrix_local = o.matrix_local @ tmat_inv
+                self._set_mat_local(o, o.matrix_local @ tmat_inv)
 
         # What does o.matrix_local turn into?
         # * no child, no instance: o.matrix_local
@@ -92,3 +97,17 @@ class ForceApplyTransform(bpy.types.Operator):
         # * no child, instance: o.matrix_local @ tmat_inv
         # * child, instance: tmat @ o.matrix_local @ tmat_inv
         return {'FINISHED'}
+
+    def _set_mat_local(self, ob, mat):
+        round_mat(mat, self.round_to)
+        ob.matrix_local = mat
+
+
+def round_mat(mat, ndigits=6):
+    """
+    Round every entry in the given matrix to consist of maximally
+    n digits
+    """
+    for row in mat:
+        for i in range(len(row)):
+            row[i] = round(row[i], ndigits)
