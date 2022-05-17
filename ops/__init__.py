@@ -21,6 +21,7 @@ for m in [
     ".select_by_name",
     ".select_concave_parts",
     ".select_flipped_faces",
+    ".select_nearby",
     ".select_visible",
     ".select_loose_by_size",
     ".select_n_instances",
