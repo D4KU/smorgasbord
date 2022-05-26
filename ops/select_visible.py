@@ -101,8 +101,9 @@ class SelectVisible(bpy.types.Operator):
                 gl_Position = mvp * vec4(pos, 1);
             }''',
             fragcode='''
+            out vec4 col;
             void main() {
-                gl_FragColor = vec4(0, 0, 1, 1);
+                col = vec4(0, 0, 1, 1);
             }'''
         )
         shader.bind()
