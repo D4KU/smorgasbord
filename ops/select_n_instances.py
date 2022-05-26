@@ -57,19 +57,16 @@ class SelectNInstances(bpy.types.Operator):
             o.select_set(False)
             datas.add(o.data)
 
-        # For each data, find all linked objects in the collection
-        # The dict is initialized with all datas of relevance
-        dataToObs = dict.fromkeys(datas, [])
-        datas.clear()
+        # For each data, find all linked objects in the collection.
+        # The dict is initialized with all relevant datas as keys.
+        datas = {key: [] for key in datas}
         for o in context.view_layer.objects:
-            try:
-                dataToObs[o.data].append(o)
-            except KeyError:
-                # Data isn't a key, we aren't interested in its instances
-                pass
+            # If data isn't found, ignore object by appending to a new
+            # list that is tossed away.
+            datas.get(o.data, []).append(o)
 
         # One loop iteration handles one data
-        for objects in dataToObs.values():
+        for objects in datas.values():
             # Set upper bound to infinity if its non-negative and smaller
             # than the lower bound.
             # Negative values count from end of the list of instances
