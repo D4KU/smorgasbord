@@ -1,9 +1,7 @@
-[![Buy me a coffee](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/d4ku)
-
-This repository contains various Blender operators to assist with the
-simplification, skinning, and material assignment of CAD-derived meshes. It is
-implemented in pure Python and therefore not always fast in handling
-high-polygonal meshes. It is also under development, so beware of bugs!
+This repository contains various Blender operators to assist me with my daily
+work. Because I mainly work on high-poly CAD models, most operators in here
+center around organization, simplification, cleaning, and smart selection of
+things. I hope you will find something useful, too.
 
 1. [Installation](#installation)
 2. [Operators](#operators)  
@@ -12,31 +10,33 @@ high-polygonal meshes. It is also under development, so beware of bugs!
 2.3 [Select Loose by Size](#select-loose-by-size)  
 2.4 [Select Similar](#select-similar)  
 2.5 [Select Visible](#select-visible)  
-2.6 [Transfer Materials](#transfer-materials)  
-2.7 [Select Concave Parts](#select-concave-partsselect-concave-parts)  
-2.8 [Lerp Weights](#lerp-weights)  
-2.9 [Set Parent Advanced](#set-parent-advanced)  
-2.10 [Apply Name](#apply-name)  
-2.11 [Select All by Name](#select-all-byname)  
-2.12 [Replace Duplicate Materials](#replace-duplicate-materials)  
-2.13 [Prepare Export to Unity](#prepare-export-to-unity)  
-2.14 [Vertex Color to Group](#vertex-color-to-group)  
-2.15 [Remove Empty Vertex Groups](#remove-empty-vertex-groups)  
-2.16 [Remove Similar UV Maps](#remove-similar-uv-maps)  
-2.17 [Force Apply Transform](#force-apply-transform)  
-2.18 [Force Apply Modifier](#force-apply-modifier)  
-2.19 [Select N Instances](#select-n-instances)  
-2.20 [Viewport Display from Shader](#viewport-display-from-shader)
+2.6 [Select Overlap](#select-overlap)  
+2.7 [Transfer Materials](#transfer-materials)  
+2.8 [Select Concave Parts](#select-concave-parts)  
+2.9 [Lerp Weights](#lerp-weights)  
+2.10 [Set Parent Advanced](#set-parent-advanced)  
+2.11 [Apply Name](#apply-name)  
+2.12 [Select All by Name](#select-all-by-name)  
+2.13 [Replace Duplicate Materials](#replace-duplicate-materials)  
+2.14 [Prepare Export to Unity](#prepare-export-to-unity)  
+2.15 [Vertex Color to Group](#vertex-color-to-group)  
+2.16 [Join as Vertex Group](#join-as-vertex-group)  
+2.17 [Remove Empty Vertex Groups](#remove-empty-vertex-groups)  
+2.18 [Remove Similar UV Maps](#remove-similar-uv-maps)  
+2.19 [Force Apply Transform](#force-apply-transform)  
+2.20 [Force Apply Modifier](#force-apply-modifier)  
+2.21 [Select N Instances](#select-n-instances)  
+2.22 [Viewport Display from Shader](#viewport-display-from-shader)
 
 
 # Installation
 
-The existence of submodules makes it unfortunately not possible to completely
+The existence of submodules unfortunately makes it not possible to completely
 download the repository as a zip file. Do this instead:
 
-* Navigate to Blender's *addons* directory. If you don't know the path, type
-`bpy.utils.user_resource('SCRIPTS', "addons")` into Blender's Python Console
-to see it.
+* Navigate to Blender's *addons* directory. If you don't know the path, type\
+`bpy.utils.user_resource('SCRIPTS', path="addons")` into Blender's Python
+Console to see it.
 * Clone via `git clone --recurse-submodules https://github.com/D4KU/smorgasbord.git`
 * In Blender, navigate to `Edit > Preferences > Add-ons`
 * Hit the *Refresh* button
@@ -118,6 +118,13 @@ catch the ones this operator missed, and then to invert the selection. This is
 shown in the animation below.
 
 ![](https://github.com/D4KU/smorgasbord/blob/master/media/SelectVisible.gif)
+
+### Select Overlap
+
+`[Edit mode] Select > Select Overlap`
+
+Select vertices in the active object close to vertices in selected objects.
+How close can be controlled via a parameter.
 
 
 ### Transfer Materials
@@ -221,6 +228,13 @@ For every selected object, convert the active vertex color layer into a
 eponymous vertex group. To convert from RGB values to scalar weights either
 all channels are averaged or only individual ones are passed through.
 
+### Join as Vertex Group
+
+`[Object mode] Object > Join as Vertex Group`
+
+Join selected objects into the active object and create a vertex group for
+each joined-in object.
+
 
 ### Remove Empty Vertex Groups
 
@@ -247,9 +261,7 @@ in both compared maps.
 Circumvents the restriction that an object's transform can't be applied to
 its mesh if that mesh is shared with other objects. After applying the active
 object's transform to the mesh, the local transform of other instances is
-updated so that they stay in place. If other objects are selected besides
-the active one, this compensation transformation is only applied to instances
-within the selection.
+updated so that they stay in place.
 
 Instead of setting the pivot point to the world origin, it can alternatively
 be set to the cursor. This results in the same behaviour as the built-in

@@ -5,9 +5,9 @@ from smorgasbord.common.decorate import register
 
 
 @register
-class SelectNearby(bpy.types.Operator):
-    bl_idname = "mesh.select_nearby"
-    bl_label = "Select Nearby"
+class SelectOverlap(bpy.types.Operator):
+    bl_idname = "mesh.select_overlap"
+    bl_label = "Select Overlap"
     bl_description = (
         "Select vertices in the active object close to vertices in "
         "selected objects"
