@@ -14,7 +14,7 @@ class DeleteChildlessEmpties(bpy.types.Operator):
 
 
     def execute(self, context):
-        for o in context.collection.all_objects:
+        for o in context.collection.objects:
             if o.type == 'EMPTY' and len(o.children) == 0:
                 bpy.data.objects.remove(o)
 

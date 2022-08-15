@@ -2,6 +2,7 @@ from importlib import import_module
 for m in [
     ".align_bounds",
     ".apply_name",
+    ".delete_childless_empties",
     ".force_apply_modifier",
     ".force_apply_transform",
     ".force_join",
