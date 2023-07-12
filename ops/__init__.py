@@ -29,6 +29,7 @@ for m in [
     ".select_similar",
     ".set_parent_advanced",
     ".smart_parent_to_empty",
+    ".toggle_material_links",
     ".vertex_color_to_group",
     ".viewport_display_from_shader",
 ]:

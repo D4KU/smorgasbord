@@ -42,13 +42,13 @@ class ReplaceDuplicateMaterials(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return len(context.selected_objects) > 0
+        return len(context.selected_editable_objects) > 0
 
     def execute(self, context):
         old_active = context.view_layer.objects.active
         cmats = bpy.data.materials
         pat = re.compile(self.pattern)
-        for o in context.selected_objects:
+        for o in context.selected_editable_objects:
             for slot in o.material_slots:
                 if not slot.material:
                     continue  # next slot
