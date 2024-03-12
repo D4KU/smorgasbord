@@ -1,4 +1,3 @@
-import bgl
 import bpy
 import gpu
 import numpy as np
@@ -164,19 +163,20 @@ class SelectVisible(bpy.types.Operator):
 
             with offbuf.bind():
                 # Render the selected objects into the offscreen buffer
-                bgl.glDepthMask(bgl.GL_TRUE)
-                bgl.glClear(bgl.GL_DEPTH_BUFFER_BIT)
-                bgl.glEnable(bgl.GL_DEPTH_TEST)
+                framebuffer = gpu.state.active_framebuffer_get()
+                gpu.state.depth_mask_set(True)
+                framebuffer.clear(depth=1.0)
+                gpu.state.depth_test_set('LESS')
                 batch.draw()
 
                 # Write texture back to CPU
-                pxbuf = bgl.Buffer(bgl.GL_FLOAT, dim * dim)
-                bgl.glReadBuffer(bgl.GL_BACK)
-                bgl.glReadPixels(0, 0, dim, dim, bgl.GL_DEPTH_COMPONENT,
-                                 bgl.GL_FLOAT, pxbuf)
+                pxbuf = framebuffer.read_depth(0, 0, dim, dim)
+                # Have to reset the state to not hit https://projects.blender.org/blender/blender/issues/98486
+                gpu.state.depth_mask_set(False)
+                gpu.state.depth_test_set('NONE')
 
             # Map depth values from [0, 1] to [-1, 1]
-            pxbuf = np.asanyarray(pxbuf) * 2 - 1
+            pxbuf = np.array(pxbuf.to_list()) * 2 - 1
             pxbuf.shape = (dim, dim)
 
             # Transform verts of active object to clip space
