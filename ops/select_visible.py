@@ -132,7 +132,7 @@ class SelectVisible(bpy.types.Operator):
                 )
 
         # Render the objects from several views and mark seen vertices
-        visibl = np.zeros(len(verts), dtype=np.bool)
+        visibl = np.zeros(len(verts), dtype=bool)
         for _ in range(self.samplecnt):
             # Generate random points on the chosen domain from which
             # to render the objects
