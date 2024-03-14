@@ -33,7 +33,7 @@ def sample_mesh(mesh, samplecnt=1024, mask=None):
     bob.from_mesh(mesh, face_normals=False)
     if mask is not None:
         bfaces = np.array(bob.faces)
-        invmask = np.ones(len(bfaces), dtype=np.bool)
+        invmask = np.ones(len(bfaces), dtype=bool)
         invmask[mask] = False
         bm.ops.delete(bob, geom=bfaces[invmask], context='FACES')
         del bfaces, invmask

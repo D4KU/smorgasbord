@@ -47,11 +47,11 @@ class RemoveEmptyVertexGroups(bpy.types.Operator):
             vgs = o.vertex_groups
             # Bool array storing True at each vertex group's index which
             # is going to be removed
-            to_remov = np.ones(len(vgs), np.bool)
+            to_remov = np.ones(len(vgs), bool)
 
             for v in o.data.vertices:
                 gindcs  = get_scalars(v.groups, 'group',  np.int8)
-                weights = get_scalars(v.groups, 'weight', np.float)
+                weights = get_scalars(v.groups, 'weight', float)
                 # Unset every group for which vertex v has a weight
                 # bigger than the threshold
                 to_remov[gindcs[weights > self.threshold]] = False

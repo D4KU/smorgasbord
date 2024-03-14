@@ -45,7 +45,7 @@ def set_vals(geom, vals, attr='co'):
     geom.data.update()
 
 
-def get_scalars(geom, attr='select', dtype=np.bool):
+def get_scalars(geom, attr='select', dtype=bool):
     """
     Return Boolean values of a Blender property collection
     as a numpy array.
